@@ -720,20 +720,14 @@ async fn with_immediate_transaction<
         // Start the transaction in IMMEDIATE mode since all updates may cause writes,
         // to avoid read transactions upgrading to write mode and causing
         // SQLITE_BUSY errors. See also: https://www.sqlite.org/lang_transaction.html#deferred_immediate_and_exclusive_transactions
-        conn.set_transaction_behavior(TransactionBehavior::Immediate);
-
         let code = || -> Result<T, Error> {
-            let txn = conn.transaction()?;
+            let txn = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
             let res = f(&txn)?;
             txn.commit()?;
             Ok(res)
         };
 
         let res = code();
-
-        // Reset the transaction behavior to use Deferred, after this transaction has
-        // been run, whether it was successful or not.
-        conn.set_transaction_behavior(TransactionBehavior::Deferred);
 
         res
     })
