@@ -4920,7 +4920,7 @@ dependencies = [
 [[package]]
 name = "ruma"
 version = "0.12.1"
-source = "git+https://github.com/ruma/ruma?rev=7755c7cbc580f8d8aea30d78cc1a6850b1a6fd39#7755c7cbc580f8d8aea30d78cc1a6850b1a6fd39"
+source = "git+https://github.com/fedibtc/ruma?tag=ruma-0.12.1-fedi2#2d2d829ba8faf62ae904f464c3601dd2307006c8"
 dependencies = [
  "assign",
  "js_int",
@@ -4936,7 +4936,7 @@ dependencies = [
 [[package]]
 name = "ruma-client-api"
 version = "0.20.1"
-source = "git+https://github.com/ruma/ruma?rev=7755c7cbc580f8d8aea30d78cc1a6850b1a6fd39#7755c7cbc580f8d8aea30d78cc1a6850b1a6fd39"
+source = "git+https://github.com/fedibtc/ruma?tag=ruma-0.12.1-fedi2#2d2d829ba8faf62ae904f464c3601dd2307006c8"
 dependencies = [
  "as_variant",
  "assign",
@@ -4959,7 +4959,7 @@ dependencies = [
 [[package]]
 name = "ruma-common"
 version = "0.15.1"
-source = "git+https://github.com/ruma/ruma?rev=7755c7cbc580f8d8aea30d78cc1a6850b1a6fd39#7755c7cbc580f8d8aea30d78cc1a6850b1a6fd39"
+source = "git+https://github.com/fedibtc/ruma?tag=ruma-0.12.1-fedi2#2d2d829ba8faf62ae904f464c3601dd2307006c8"
 dependencies = [
  "as_variant",
  "base64 0.22.1",
@@ -4991,7 +4991,7 @@ dependencies = [
 [[package]]
 name = "ruma-events"
 version = "0.30.1"
-source = "git+https://github.com/ruma/ruma?rev=7755c7cbc580f8d8aea30d78cc1a6850b1a6fd39#7755c7cbc580f8d8aea30d78cc1a6850b1a6fd39"
+source = "git+https://github.com/fedibtc/ruma?tag=ruma-0.12.1-fedi2#2d2d829ba8faf62ae904f464c3601dd2307006c8"
 dependencies = [
  "as_variant",
  "indexmap 2.7.1",
@@ -5016,7 +5016,7 @@ dependencies = [
 [[package]]
 name = "ruma-federation-api"
 version = "0.11.0"
-source = "git+https://github.com/ruma/ruma?rev=7755c7cbc580f8d8aea30d78cc1a6850b1a6fd39#7755c7cbc580f8d8aea30d78cc1a6850b1a6fd39"
+source = "git+https://github.com/fedibtc/ruma?tag=ruma-0.12.1-fedi2#2d2d829ba8faf62ae904f464c3601dd2307006c8"
 dependencies = [
  "http",
  "js_int",
@@ -5030,7 +5030,7 @@ dependencies = [
 [[package]]
 name = "ruma-html"
 version = "0.4.0"
-source = "git+https://github.com/ruma/ruma?rev=7755c7cbc580f8d8aea30d78cc1a6850b1a6fd39#7755c7cbc580f8d8aea30d78cc1a6850b1a6fd39"
+source = "git+https://github.com/fedibtc/ruma?tag=ruma-0.12.1-fedi2#2d2d829ba8faf62ae904f464c3601dd2307006c8"
 dependencies = [
  "as_variant",
  "html5ever",
@@ -5042,7 +5042,7 @@ dependencies = [
 [[package]]
 name = "ruma-identifiers-validation"
 version = "0.10.1"
-source = "git+https://github.com/ruma/ruma?rev=7755c7cbc580f8d8aea30d78cc1a6850b1a6fd39#7755c7cbc580f8d8aea30d78cc1a6850b1a6fd39"
+source = "git+https://github.com/fedibtc/ruma?tag=ruma-0.12.1-fedi2#2d2d829ba8faf62ae904f464c3601dd2307006c8"
 dependencies = [
  "js_int",
  "thiserror 2.0.11",
@@ -5051,7 +5051,7 @@ dependencies = [
 [[package]]
 name = "ruma-macros"
 version = "0.15.1"
-source = "git+https://github.com/ruma/ruma?rev=7755c7cbc580f8d8aea30d78cc1a6850b1a6fd39#7755c7cbc580f8d8aea30d78cc1a6850b1a6fd39"
+source = "git+https://github.com/fedibtc/ruma?tag=ruma-0.12.1-fedi2#2d2d829ba8faf62ae904f464c3601dd2307006c8"
 dependencies = [
  "cfg-if",
  "proc-macro-crate",
