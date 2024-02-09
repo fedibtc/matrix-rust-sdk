@@ -21,7 +21,7 @@ use indexmap::IndexMap;
 use matrix_sdk::crypto::{DecryptionSettings, TrustRequirement};
 use matrix_sdk::{
     deserialized_responses::TimelineEvent, event_cache::paginator::PaginableRoom, BoxFuture,
-    Result, Room,
+    Result, Room, SendOutsideWasm, SyncOutsideWasm,
 };
 use matrix_sdk_base::{latest_event::LatestEvent, RoomInfo};
 use ruma::{
@@ -47,7 +47,7 @@ pub trait RoomExt {
     /// independent events.
     ///
     /// This is the same as using `room.timeline_builder().build()`.
-    fn timeline(&self) -> impl Future<Output = Result<Timeline, timeline::Error>> + Send;
+    fn timeline(&self) -> impl Future<Output = Result<Timeline, timeline::Error>> + Send; // FIXME:m
 
     /// Get a [`TimelineBuilder`] for this room.
     ///
@@ -71,7 +71,7 @@ impl RoomExt for Room {
 }
 
 pub(super) trait RoomDataProvider:
-    Clone + Send + Sync + 'static + PaginableRoom + PinnedEventsRoom
+    Clone + SendOutsideWasm + SyncOutsideWasm + 'static + PaginableRoom
 {
     fn own_user_id(&self) -> &UserId;
     fn room_version(&self) -> RoomVersionId;
@@ -287,7 +287,7 @@ pub(super) trait Decryptor: Clone + Send + Sync + 'static {
     fn decrypt_event_impl(
         &self,
         raw: &Raw<AnySyncTimelineEvent>,
-    ) -> impl Future<Output = Result<TimelineEvent>> + Send;
+    ) -> impl Future<Output = Result<TimelineEvent>> + Send; // FIXME: m
 }
 
 impl Decryptor for Room {

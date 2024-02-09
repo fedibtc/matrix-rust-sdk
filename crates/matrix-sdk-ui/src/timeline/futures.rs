@@ -1,7 +1,10 @@
 use std::{fs, future::IntoFuture, path::PathBuf};
 
+#[cfg(not(target_arch = "wasm32"))]
 use eyeball::{SharedObservable, Subscriber};
-use matrix_sdk::{attachment::AttachmentConfig, TransmissionProgress};
+use matrix_sdk::attachment::AttachmentConfig;
+#[cfg(not(target_arch = "wasm32"))]
+use matrix_sdk::TransmissionProgress;
 use matrix_sdk_base::boxed_into_future;
 use mime::Mime;
 use tracing::{Instrument as _, Span};
@@ -14,6 +17,7 @@ pub struct SendAttachment<'a> {
     mime_type: Mime,
     config: AttachmentConfig,
     tracing_span: Span,
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) send_progress: SharedObservable<TransmissionProgress>,
     use_send_queue: bool,
 }
@@ -31,6 +35,7 @@ impl<'a> SendAttachment<'a> {
             mime_type,
             config,
             tracing_span: Span::current(),
+            #[cfg(not(target_arch = "wasm32"))]
             send_progress: Default::default(),
             use_send_queue: false,
         }
@@ -61,8 +66,16 @@ impl<'a> IntoFuture for SendAttachment<'a> {
     boxed_into_future!(extra_bounds: 'a);
 
     fn into_future(self) -> Self::IntoFuture {
-        let Self { timeline, path, mime_type, config, tracing_span, use_send_queue, send_progress } =
-            self;
+        let Self {
+            timeline,
+            path,
+            mime_type,
+            config,
+            tracing_span,
+            use_send_queue,
+            #[cfg(not(target_arch = "wasm32"))]
+            send_progress,
+        } = self;
 
         let fut = async move {
             let filename = path
@@ -80,8 +93,9 @@ impl<'a> IntoFuture for SendAttachment<'a> {
                 let fut = timeline
                     .room()
                     .send_attachment(filename, &mime_type, data, config)
-                    .with_send_progress_observable(send_progress)
                     .store_in_cache();
+                #[cfg(not(target_arch = "wasm32"))]
+                let fut = fut.with_send_progress_observable(send_progress);
                 fut.await.map_err(|_| Error::FailedSendingAttachment)?;
             }
 

@@ -43,7 +43,7 @@ use ruma::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::{
-    select, spawn,
+    select,
     sync::{broadcast::Sender, Mutex as AsyncMutex, OwnedMutexGuard, RwLock as AsyncRwLock},
 };
 use tracing::{debug, error, info, instrument, trace, warn, Instrument, Span};
@@ -56,7 +56,7 @@ use self::{
     client::SlidingSyncResponseProcessor,
     sticky_parameters::{LazyTransactionId, SlidingSyncStickyManager, StickyData},
 };
-use crate::{config::RequestConfig, Client, HttpError, Result};
+use crate::{config::RequestConfig, executor::spawn, Client, HttpError, Result};
 
 /// The Sliding Sync instance.
 ///
