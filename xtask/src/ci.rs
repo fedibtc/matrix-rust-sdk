@@ -96,6 +96,8 @@ enum WasmFeatureSet {
     /// Equivalent to `indexeddb-all-features`, `indexeddb-crypto` and
     /// `indexeddb-state`
     Indexeddb,
+    /// Check `matrix-sdk-ui` crate
+    MatrixSdkUi,
 }
 
 impl CiArgs {
@@ -306,6 +308,10 @@ fn run_wasm_checks(cmd: Option<WasmFeatureSet>) -> Result<()> {
             WasmFeatureSet::IndexeddbState,
             "-p matrix-sdk-indexeddb --no-default-features --features state-store",
         ),
+        (
+            WasmFeatureSet::MatrixSdkUi,
+            "-p matrix-sdk-ui --no-default-features --features matrix-sdk/js,matrix-sdk/rustls-tls,e2e-encryption",
+        ),
     ]);
 
     let run = |arg_set: &str| {
@@ -367,6 +373,10 @@ fn run_wasm_pack_tests(cmd: Option<WasmFeatureSet>) -> Result<()> {
         (
             WasmFeatureSet::IndexeddbState,
             ("crates/matrix-sdk-indexeddb", "--no-default-features --features state-store"),
+        ),
+        (
+            WasmFeatureSet::MatrixSdkUi,
+            ("crates/matrix-sdk-ui", "--no-default-features --features matrix-sdk/js,matrix-sdk/rustls-tls,e2e-encryption"),
         ),
     ]);
 
