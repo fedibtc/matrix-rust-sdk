@@ -60,6 +60,3 @@ tokio = { workspace = true, features = ["rt", "macros"] }
 # Enable the JS feature for getrandom.
 getrandom = { version = "0.2.6", default-features = false, features = ["js"] }
 js-sys = { workspace = true }
-
-[lints]
-workspace = true

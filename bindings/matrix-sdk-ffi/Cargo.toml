@@ -78,8 +78,5 @@ features = [
     "uniffi",
 ]
 
-[lints]
-workspace = true
-
 [package.metadata.release]
 release = false

@@ -27,8 +27,5 @@ url = { workspace = true }
 path = "../../crates/matrix-sdk"
 features = ["experimental-oidc"]
 
-[lints]
-workspace = true
-
 [package.metadata.release]
 release = false
