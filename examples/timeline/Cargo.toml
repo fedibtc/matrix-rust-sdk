@@ -19,6 +19,3 @@ url = { workspace = true }
 # have copied the example as it was at the time of the release you use.
 matrix-sdk = { path = "../../crates/matrix-sdk" }
 matrix-sdk-ui = { path = "../../crates/matrix-sdk-ui" }
-
-[lints]
-workspace = true

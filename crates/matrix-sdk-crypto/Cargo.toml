@@ -85,6 +85,3 @@ similar-asserts = "1.5.0"
 # required for async_test macro
 stream_assert = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-
-[lints]
-workspace = true
