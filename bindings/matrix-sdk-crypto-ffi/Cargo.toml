@@ -65,8 +65,5 @@ uniffi = { workspace = true, features = ["build"] }
 tempfile = "3.8.0"
 assert_matches2 = { workspace = true }
 
-[lints]
-workspace = true
-
 [package.metadata.release]
 release = false

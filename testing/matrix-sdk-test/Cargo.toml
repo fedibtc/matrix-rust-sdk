@@ -33,8 +33,5 @@ wiremock = { workspace = true }
 getrandom = { version = "0.2.6", default-features = false, features = ["js"] }
 wasm-bindgen-test = "0.3.33"
 
-[lints]
-workspace = true
-
 [package.metadata.release]
 release = false

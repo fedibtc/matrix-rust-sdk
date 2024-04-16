@@ -18,8 +18,5 @@ tracing-subscriber = { workspace = true }
 # have copied the example as it was at the time of the release you use.
 matrix-sdk = { path = "../../crates/matrix-sdk" }
 
-[lints]
-workspace = true
-
 [package.metadata.release]
 release = false
