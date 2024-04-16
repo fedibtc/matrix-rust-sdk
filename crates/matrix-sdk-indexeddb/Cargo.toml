@@ -59,6 +59,3 @@ tracing-subscriber = { workspace = true, features = ["registry", "tracing-log"] 
 uuid = { workspace = true }
 wasm-bindgen-test = { workspace = true }
 web-sys = { workspace = true, features = ["IdbKeyRange", "Window", "Performance"] }
-
-[lints]
-workspace = true
