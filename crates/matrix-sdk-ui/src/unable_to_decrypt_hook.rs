@@ -25,15 +25,11 @@ use std::{
 };
 
 use growable_bloom_filter::{GrowableBloom, GrowableBloomBuilder};
+use matrix_sdk::executor::{spawn, JoinHandle};
 use matrix_sdk::{crypto::types::events::UtdCause, Client};
 use matrix_sdk_base::{StateStoreDataKey, StateStoreDataValue, StoreError};
 use ruma::{EventId, OwnedEventId};
-use tokio::{
-    spawn,
-    sync::{Mutex as AsyncMutex, MutexGuard},
-    task::JoinHandle,
-    time::sleep,
-};
+use tokio::sync::{Mutex as AsyncMutex, MutexGuard};
 use tracing::error;
 
 /// A generic interface which methods get called whenever we observe a
@@ -232,7 +228,10 @@ impl UtdHookManager {
         // hook then.
         let handle = spawn(async move {
             // Wait for the given delay.
-            sleep(max_delay).await;
+            #[cfg(not(target_arch = "wasm32"))]
+            tokio::time::sleep(max_delay).await;
+            #[cfg(target_arch = "wasm32")]
+            gloo_timers::future::TimeoutFuture::new(max_delay.as_millis() as u32).await;
 
             // Make sure we take out the lock on `reported_utds` before removing the entry
             // from `pending_delayed`, to ensure we don't race against another call to
@@ -268,7 +267,8 @@ impl UtdHookManager {
         // Only let the parent hook know about the late decryption if the event is
         // a pending UTD. If so, remove the event from the pending list —
         // doing so will cause the reporting task to no-op if it runs.
-        let Some(pending_utd_report) = self.pending_delayed.lock().unwrap().remove(event_id) else {
+        let Some(mut pending_utd_report) = self.pending_delayed.lock().unwrap().remove(event_id)
+        else {
             return;
         };
 
@@ -325,7 +325,7 @@ impl Drop for UtdHookManager {
         // the entry has been removed from `pending_delayed` (which is fine), or the
         // report task will successfully report the UTD (which is fine).
         let mut pending_delayed = self.pending_delayed.lock().unwrap();
-        for (_, pending_utd_report) in pending_delayed.drain() {
+        for (_, mut pending_utd_report) in pending_delayed.drain() {
             pending_utd_report.report_task.abort();
         }
     }
@@ -336,6 +336,7 @@ mod tests {
     use matrix_sdk::test_utils::no_retry_test_client;
     use matrix_sdk_test::async_test;
     use ruma::event_id;
+    use tokio::time::sleep;
 
     use super::*;
 
