@@ -69,7 +69,12 @@ impl<'a> IntoFuture for SendAttachment<'a> {
                 .ok_or(Error::InvalidAttachmentFileName)?;
             let data = fs::read(&path).map_err(|_| Error::InvalidAttachmentData)?;
 
-            let value = timeline.room().send_attachment(path, &mime_type, data, config);
+            let value = timeline.room().send_attachment(
+                path.to_str().unwrap_or_default(),
+                &mime_type,
+                data,
+                config,
+            );
             #[cfg(not(target_arch = "wasm32"))]
             let value = value.with_send_progress_observable(send_progress);
             value.await.map_err(|_| Error::FailedSendingAttachment)?;

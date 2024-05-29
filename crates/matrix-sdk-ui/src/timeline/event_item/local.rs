@@ -28,6 +28,7 @@ pub(in crate::timeline) struct LocalEventTimelineItem {
     pub send_state: EventSendState,
     /// The transaction ID.
     pub transaction_id: OwnedTransactionId,
+    #[cfg(not(target_arch = "wasm32"))]
     /// A handle to manipulate this event before it is sent, if possible.
     pub send_handle: Option<SendHandle>,
 }

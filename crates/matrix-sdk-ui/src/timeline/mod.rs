@@ -499,6 +499,7 @@ impl Timeline {
                     return Ok(false);
                 };
 
+                #[cfg(not(target_arch = "wasm32"))]
                 if let Some(handle) = item.as_local().and_then(|item| item.send_handle.clone()) {
                     // Assume no relations, since it's not been sent yet.
                     let new_content: RoomMessageEventContent = new_content.into();
@@ -749,13 +750,13 @@ impl Timeline {
     ) -> Result<bool, RedactEventError> {
         match &event.kind {
             EventTimelineItemKind::Local(local) => {
+                #[cfg(not(target_arch = "wasm32"))]
                 if let Some(handle) = local.send_handle.clone() {
-                    Ok(handle.abort().await.map_err(RedactEventError::RoomQueueError)?)
-                } else {
-                    // No abort handle; theoretically unreachable for regular usage of the
-                    // timeline, but this may happen in testing contexts.
-                    Err(RedactEventError::UnsupportedRedactLocal(local.transaction_id.clone()))
+                    return Ok(handle.abort().await.map_err(RedactEventError::RoomQueueError)?);
                 }
+                // No abort handle; theoretically unreachable for regular usage of the
+                // timeline, but this may happen in testing contexts.
+                Err(RedactEventError::UnsupportedRedactLocal(local.transaction_id.clone()))
             }
 
             EventTimelineItemKind::Remote(remote) => {
@@ -967,7 +968,7 @@ impl Drop for TimelineDropHandle {
         for handle in self.event_handler_handles.drain(..) {
             self.client.remove_event_handler(handle);
         }
-        if let Some(handle) = self.local_echo_listener_handle.take() {
+        if let Some(mut handle) = self.local_echo_listener_handle.take() {
             handle.abort()
         };
         self.room_update_join_handle.abort();
