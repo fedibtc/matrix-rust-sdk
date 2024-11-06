@@ -147,7 +147,7 @@ use matrix_sdk_base::{
         SentMediaInfo, SentRequestKey, SerializableEventContent,
     },
     store_locks::LockStoreError,
-    RoomState, StoreError,
+    RoomState, SendWrapperInsideWasm, StoreError,
 };
 use matrix_sdk_common::executor::{spawn, JoinHandle};
 use mime::Mime;
@@ -365,7 +365,7 @@ impl Room {
 /// This is cheap to clone.
 #[derive(Clone)]
 pub struct RoomSendQueue {
-    inner: Arc<RoomSendQueueInner>,
+    inner: Arc<SendWrapperInsideWasm<RoomSendQueueInner>>,
 }
 
 #[cfg(not(tarpaulin_include))]
@@ -402,14 +402,14 @@ impl RoomSendQueue {
         ));
 
         Self {
-            inner: Arc::new(RoomSendQueueInner {
+            inner: Arc::new(SendWrapperInsideWasm::new(RoomSendQueueInner {
                 room: weak_room,
                 updates: updates_sender,
                 _task: task,
                 queue,
                 notifier,
                 locally_enabled,
-            }),
+            })),
         }
     }
 

@@ -15,7 +15,11 @@
 #![doc = include_str!("../README.md")]
 #![warn(missing_debug_implementations)]
 
-use std::pin::Pin;
+use std::{
+    fmt,
+    ops::{Deref, DerefMut},
+    pin::Pin,
+};
 
 use futures_core::Future;
 #[doc(no_inline)]
@@ -95,6 +99,76 @@ macro_rules! boxed_into_future {
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 #[cfg(not(target_arch = "wasm32"))]
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+
+/// This implements Send for any T
+///
+/// On Non Wasm, this type is no op.
+/// On Wasm, this type panics if deref is called from different thread.
+#[derive(Clone)]
+pub struct SendWrapperInsideWasm<T> {
+    // __ to improve rust analyzer error
+    #[cfg(not(target_family = "wasm"))]
+    __inner: T,
+    #[cfg(target_family = "wasm")]
+    __inner: send_wrapper::SendWrapper<T>,
+}
+
+impl<T> SendWrapperInsideWasm<T> {
+    pub fn new(inner: T) -> Self {
+        Self {
+            #[cfg(not(target_family = "wasm"))]
+            __inner: inner,
+            #[cfg(target_family = "wasm")]
+            __inner: send_wrapper::SendWrapper::new(inner),
+        }
+    }
+
+    pub fn take(self) -> T {
+        #[cfg(not(target_family = "wasm"))]
+        {
+            self.__inner
+        }
+        #[cfg(target_family = "wasm")]
+        {
+            self.__inner.take()
+        }
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for SendWrapperInsideWasm<T> {
+    #[track_caller]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        T::fmt(&self.__inner, f)
+    }
+}
+
+impl<T> Deref for SendWrapperInsideWasm<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        #[cfg(not(target_family = "wasm"))]
+        {
+            &self.__inner
+        }
+        #[cfg(target_family = "wasm")]
+        {
+            &*self.__inner
+        }
+    }
+}
+
+impl<T> DerefMut for SendWrapperInsideWasm<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        #[cfg(not(target_family = "wasm"))]
+        {
+            &mut self.__inner
+        }
+        #[cfg(target_family = "wasm")]
+        {
+            &mut *self.__inner
+        }
+    }
+}
 
 #[cfg(feature = "uniffi")]
 uniffi::setup_scaffolding!();

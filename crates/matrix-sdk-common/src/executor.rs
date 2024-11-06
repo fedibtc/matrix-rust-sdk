@@ -15,6 +15,8 @@
 //! Abstraction over an executor so we can spawn tasks under WASM the same way
 //! we do usually.
 
+use core::fmt;
+use std::ops::{Deref, DerefMut};
 #[cfg(target_arch = "wasm32")]
 use std::{
     future::Future,

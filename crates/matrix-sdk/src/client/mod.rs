@@ -23,12 +23,9 @@ use std::{
 };
 
 use eyeball::{SharedObservable, Subscriber};
-#[cfg(not(target_arch = "wasm32"))]
 use eyeball_im::VectorDiff;
 use futures_core::Stream;
-#[cfg(not(target_arch = "wasm32"))]
 use futures_util::StreamExt;
-#[cfg(not(target_arch = "wasm32"))]
 use imbl::Vector;
 #[cfg(feature = "e2e-encryption")]
 use matrix_sdk_base::crypto::store::LockableCryptoStore;
@@ -36,8 +33,8 @@ use matrix_sdk_base::{
     event_cache_store::EventCacheStoreLock,
     store::{DynStateStore, ServerCapabilities},
     sync::{Notification, RoomUpdates},
-    BaseClient, RoomInfoNotableUpdate, RoomState, RoomStateFilter, SendOutsideWasm, SessionMeta,
-    StateStoreDataKey, StateStoreDataValue, SyncOutsideWasm,
+    BaseClient, RoomInfoNotableUpdate, RoomState, RoomStateFilter, SendOutsideWasm,
+    SendWrapperInsideWasm, SessionMeta, StateStoreDataKey, StateStoreDataValue, SyncOutsideWasm,
 };
 #[cfg(feature = "e2e-encryption")]
 use ruma::events::{room::encryption::RoomEncryptionEventContent, InitialStateEvent};
@@ -95,7 +92,7 @@ use crate::{
     room_preview::RoomPreview,
     send_queue::SendQueueData,
     sync::{RoomUpdate, SyncResponse},
-    Account, AuthApi, AuthSession, Error, Media, Pusher, RefreshTokenError, Result, Room,
+    Account, AuthApi, AuthSession, BaseRoom, Error, Media, Pusher, RefreshTokenError, Result, Room,
     TransmissionProgress,
 };
 #[cfg(feature = "e2e-encryption")]
@@ -957,11 +954,10 @@ impl Client {
     }
 
     /// Get a stream of all the rooms, in addition to the existing rooms.
-    #[cfg(not(target_arch = "wasm32"))]
     pub fn rooms_stream(&self) -> (Vector<Room>, impl Stream<Item = Vec<VectorDiff<Room>>> + '_) {
         let (rooms, stream) = self.base_client().rooms_stream();
 
-        let map_room = |room| Room::new(self.clone(), room);
+        let map_room = |room: SendWrapperInsideWasm<BaseRoom>| Room::new(self.clone(), room.take());
 
         (
             rooms.into_iter().map(map_room).collect(),

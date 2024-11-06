@@ -143,6 +143,7 @@ impl RoomList {
     /// call to [`RoomListDynamicEntriesController::set_filter`], the stream
     /// will yield a [`VectorDiff::Reset`] followed by any updates of the
     /// room list under that filter (until the next reset).
+    #[cfg(not(target_family = "wasm"))]
     pub fn entries_with_dynamic_adapters(
         &self,
         page_size: usize,

@@ -816,7 +816,8 @@ impl Drop for TimelineDropHandle {
             self.client.remove_event_handler(handle);
         }
 
-        if let Some(handle) = self.pinned_events_join_handle.take() {
+        #[allow(unused_mut)] // wasm only mut
+        if let Some(mut handle) = self.pinned_events_join_handle.take() {
             handle.abort()
         };
 

@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ruma::time::Instant;
 use tracing::{callsite::DefaultCallsite, Callsite as _};
-
-use crate::instant::Instant;
 
 /// A named RAII that will show on Drop how long its covered section took to
 /// execute.

@@ -47,7 +47,8 @@ pub trait RoomExt {
     /// independent events.
     ///
     /// This is the same as using `room.timeline_builder().build()`.
-    fn timeline(&self) -> impl Future<Output = Result<Timeline, timeline::Error>> + Send; // FIXME:m
+    fn timeline(&self)
+        -> impl Future<Output = Result<Timeline, timeline::Error>> + SendOutsideWasm;
 
     /// Get a [`TimelineBuilder`] for this room.
     ///
@@ -71,7 +72,7 @@ impl RoomExt for Room {
 }
 
 pub(super) trait RoomDataProvider:
-    Clone + SendOutsideWasm + SyncOutsideWasm + 'static + PaginableRoom
+    Clone + SendOutsideWasm + SyncOutsideWasm + 'static + PaginableRoom + PinnedEventsRoom
 {
     fn own_user_id(&self) -> &UserId;
     fn room_version(&self) -> RoomVersionId;
@@ -122,7 +123,7 @@ impl RoomDataProvider for Room {
     }
 
     fn profile_from_user_id<'a>(&'a self, user_id: &'a UserId) -> BoxFuture<'a, Option<Profile>> {
-        async move {
+        Box::pin(async move {
             match self.get_member_no_sync(user_id).await {
                 Ok(Some(member)) => Some(Profile {
                     display_name: member.display_name().map(ToOwned::to_owned),
@@ -136,8 +137,7 @@ impl RoomDataProvider for Room {
                     None
                 }
             }
-        }
-        .boxed()
+        })
     }
 
     fn profile_from_latest_event(&self, latest_event: &LatestEvent) -> Option<Profile> {
@@ -158,7 +158,7 @@ impl RoomDataProvider for Room {
         thread: ReceiptThread,
         user_id: &'a UserId,
     ) -> BoxFuture<'a, Option<(OwnedEventId, Receipt)>> {
-        async move {
+        Box::pin(async move {
             match self.load_user_receipt(receipt_type.clone(), thread.clone(), user_id).await {
                 Ok(receipt) => receipt,
                 Err(e) => {
@@ -171,15 +171,14 @@ impl RoomDataProvider for Room {
                     None
                 }
             }
-        }
-        .boxed()
+        })
     }
 
     fn load_event_receipts<'a>(
         &'a self,
         event_id: &'a EventId,
     ) -> BoxFuture<'a, IndexMap<OwnedUserId, Receipt>> {
-        async move {
+        Box::pin(async move {
             let mut unthreaded_receipts = match self
                 .load_event_receipts(ReceiptType::Read, ReceiptThread::Unthreaded, event_id)
                 .await
@@ -204,12 +203,11 @@ impl RoomDataProvider for Room {
 
             unthreaded_receipts.extend(main_thread_receipts);
             unthreaded_receipts
-        }
-        .boxed()
+        })
     }
 
     fn push_rules_and_context(&self) -> BoxFuture<'_, Option<(Ruleset, PushConditionRoomCtx)>> {
-        async {
+        Box::pin(async {
             match self.push_context().await {
                 Ok(Some(push_context)) => match self.client().account().push_rules().await {
                     Ok(push_rules) => Some((push_rules, push_context)),
@@ -227,12 +225,11 @@ impl RoomDataProvider for Room {
                     None
                 }
             }
-        }
-        .boxed()
+        })
     }
 
     fn load_fully_read_marker(&self) -> BoxFuture<'_, Option<OwnedEventId>> {
-        async {
+        Box::pin(async {
             match self.account_data_static::<FullyReadEventContent>().await {
                 Ok(Some(fully_read)) => match fully_read.deserialize() {
                     Ok(fully_read) => Some(fully_read.content.event_id),
@@ -247,16 +244,14 @@ impl RoomDataProvider for Room {
                 }
                 _ => None,
             }
-        }
-        .boxed()
+        })
     }
 
     fn send(&self, content: AnyMessageLikeEventContent) -> BoxFuture<'_, Result<(), super::Error>> {
-        async move {
+        Box::pin(async move {
             let _ = self.send_queue().send(content).await?;
             Ok(())
-        }
-        .boxed()
+        })
     }
 
     fn redact<'a>(
@@ -265,15 +260,14 @@ impl RoomDataProvider for Room {
         reason: Option<&'a str>,
         transaction_id: Option<OwnedTransactionId>,
     ) -> BoxFuture<'a, Result<(), super::Error>> {
-        async move {
+        Box::pin(async move {
             let _ = self
                 .redact(event_id, reason, transaction_id)
                 .await
                 .map_err(RedactError::HttpError)
                 .map_err(super::Error::RedactError)?;
             Ok(())
-        }
-        .boxed()
+        })
     }
 
     fn room_info(&self) -> Subscriber<RoomInfo> {
@@ -283,11 +277,11 @@ impl RoomDataProvider for Room {
 
 // Internal helper to make most of retry_event_decryption independent of a room
 // object, which is annoying to create for testing and not really needed
-pub(super) trait Decryptor: Clone + Send + Sync + 'static {
+pub(super) trait Decryptor: Clone + SendOutsideWasm + SyncOutsideWasm + 'static {
     fn decrypt_event_impl(
         &self,
         raw: &Raw<AnySyncTimelineEvent>,
-    ) -> impl Future<Output = Result<TimelineEvent>> + Send; // FIXME: m
+    ) -> impl Future<Output = Result<TimelineEvent>> + SendOutsideWasm;
 }
 
 impl Decryptor for Room {
