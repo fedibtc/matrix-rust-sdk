@@ -14,6 +14,7 @@
 
 #![cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![recursion_limit = "256"]
 
 use ruma::html::HtmlSanitizerMode;
 
