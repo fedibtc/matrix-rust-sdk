@@ -647,6 +647,9 @@ name = "bytes"
 version = "1.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "bytesize"
@@ -4805,7 +4808,7 @@ dependencies = [
 [[package]]
 name = "ruma"
 version = "0.13.0"
-source = "git+https://github.com/ruma/ruma?rev=91424b1fcb6642e1a579043a308fb326dd346860#91424b1fcb6642e1a579043a308fb326dd346860"
+source = "git+https://github.com/fedibtc/ruma?tag=ruma-0.13.0-fedi3#84b1a119ec7f9a666842c4d857ba2aa753dff0ac"
 dependencies = [
  "assign",
  "js_int",
@@ -4822,7 +4825,7 @@ dependencies = [
 [[package]]
 name = "ruma-client-api"
 version = "0.21.0"
-source = "git+https://github.com/ruma/ruma?rev=91424b1fcb6642e1a579043a308fb326dd346860#91424b1fcb6642e1a579043a308fb326dd346860"
+source = "git+https://github.com/fedibtc/ruma?tag=ruma-0.13.0-fedi3#84b1a119ec7f9a666842c4d857ba2aa753dff0ac"
 dependencies = [
  "as_variant",
  "assign",
@@ -4845,7 +4848,7 @@ dependencies = [
 [[package]]
 name = "ruma-common"
 version = "0.16.0"
-source = "git+https://github.com/ruma/ruma?rev=91424b1fcb6642e1a579043a308fb326dd346860#91424b1fcb6642e1a579043a308fb326dd346860"
+source = "git+https://github.com/fedibtc/ruma?tag=ruma-0.13.0-fedi3#84b1a119ec7f9a666842c4d857ba2aa753dff0ac"
 dependencies = [
  "as_variant",
  "base64",
@@ -4878,7 +4881,7 @@ dependencies = [
 [[package]]
 name = "ruma-events"
 version = "0.31.0"
-source = "git+https://github.com/ruma/ruma?rev=91424b1fcb6642e1a579043a308fb326dd346860#91424b1fcb6642e1a579043a308fb326dd346860"
+source = "git+https://github.com/fedibtc/ruma?tag=ruma-0.13.0-fedi3#84b1a119ec7f9a666842c4d857ba2aa753dff0ac"
 dependencies = [
  "as_variant",
  "indexmap",
@@ -4904,7 +4907,7 @@ dependencies = [
 [[package]]
 name = "ruma-federation-api"
 version = "0.12.0"
-source = "git+https://github.com/ruma/ruma?rev=91424b1fcb6642e1a579043a308fb326dd346860#91424b1fcb6642e1a579043a308fb326dd346860"
+source = "git+https://github.com/fedibtc/ruma?tag=ruma-0.13.0-fedi3#84b1a119ec7f9a666842c4d857ba2aa753dff0ac"
 dependencies = [
  "headers",
  "http",
@@ -4925,7 +4928,7 @@ dependencies = [
 [[package]]
 name = "ruma-html"
 version = "0.5.0"
-source = "git+https://github.com/ruma/ruma?rev=91424b1fcb6642e1a579043a308fb326dd346860#91424b1fcb6642e1a579043a308fb326dd346860"
+source = "git+https://github.com/fedibtc/ruma?tag=ruma-0.13.0-fedi3#84b1a119ec7f9a666842c4d857ba2aa753dff0ac"
 dependencies = [
  "as_variant",
  "html5ever",
@@ -4936,7 +4939,7 @@ dependencies = [
 [[package]]
 name = "ruma-identifiers-validation"
 version = "0.11.0"
-source = "git+https://github.com/ruma/ruma?rev=91424b1fcb6642e1a579043a308fb326dd346860#91424b1fcb6642e1a579043a308fb326dd346860"
+source = "git+https://github.com/fedibtc/ruma?tag=ruma-0.13.0-fedi3#84b1a119ec7f9a666842c4d857ba2aa753dff0ac"
 dependencies = [
  "js_int",
  "thiserror 2.0.16",
@@ -4945,7 +4948,7 @@ dependencies = [
 [[package]]
 name = "ruma-macros"
 version = "0.16.0"
-source = "git+https://github.com/ruma/ruma?rev=91424b1fcb6642e1a579043a308fb326dd346860#91424b1fcb6642e1a579043a308fb326dd346860"
+source = "git+https://github.com/fedibtc/ruma?tag=ruma-0.13.0-fedi3#84b1a119ec7f9a666842c4d857ba2aa753dff0ac"
 dependencies = [
  "cfg-if",
  "proc-macro-crate",
@@ -4960,7 +4963,7 @@ dependencies = [
 [[package]]
 name = "ruma-signatures"
 version = "0.18.0"
-source = "git+https://github.com/ruma/ruma?rev=91424b1fcb6642e1a579043a308fb326dd346860#91424b1fcb6642e1a579043a308fb326dd346860"
+source = "git+https://github.com/fedibtc/ruma?tag=ruma-0.13.0-fedi3#84b1a119ec7f9a666842c4d857ba2aa753dff0ac"
 dependencies = [
  "base64",
  "ed25519-dalek",
