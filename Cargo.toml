@@ -59,7 +59,7 @@ reqwest = { version = "0.12.12", default-features = false }
 rmp-serde = "1.3.0"
 # Be careful to use commits from the https://github.com/ruma/ruma/tree/ruma-0.12
 # branch until a proper release with breaking changes happens.
-ruma = { git = "https://github.com/ruma/ruma", rev = "b4941a991919685345646a230b05b985338ec3f8", features = [
+ruma = { version = "0.12.2", git = "https://github.com/fedibtc/ruma", tag = "ruma-0.12.2-fedi2", features = [
     "client-api-c",
     "compat-upload-signatures",
     "compat-user-id",
