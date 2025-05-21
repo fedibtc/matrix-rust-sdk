@@ -688,7 +688,7 @@ impl EventCacheStore for SqliteEventCacheStore {
                         // | $ev2     | !r0             | 42       | 2        |
                         // | $ev3     | !r0             | 42       | 3        |
                         // | $ev4     | !r0             | 42       | 4        |
-                        // 
+                        //
                         // `$ev2` has been removed, then we end up in this
                         // state:
                         //
@@ -702,7 +702,7 @@ impl EventCacheStore for SqliteEventCacheStore {
                         //
                         // We need to shift the `position` of `$ev3` and `$ev4`
                         // to `position - 1`, like so:
-                        // 
+                        //
                         // | event_id | linked_chunk_id | chunk_id | position |
                         // |----------|-----------------|----------|----------|
                         // | $ev0     | !r0             | 42       | 0        |
@@ -762,7 +762,7 @@ impl EventCacheStore for SqliteEventCacheStore {
                         // see _dropping and re-creating the index_, which is
                         // no-go for us, it's too expensive. I (@hywan) have
                         // adopted the following one:
-                        // 
+                        //
                         // - Do `position = position - 1` but in the negative
                         //   space, so `position = -(position - 1)`. A position
                         //   cannot be negative; we are sure it is unique!
@@ -1784,20 +1784,14 @@ async fn with_immediate_transaction<
             // Start the transaction in IMMEDIATE mode since all updates may cause writes,
             // to avoid read transactions upgrading to write mode and causing
             // SQLITE_BUSY errors. See also: https://www.sqlite.org/lang_transaction.html#deferred_immediate_and_exclusive_transactions
-            conn.set_transaction_behavior(TransactionBehavior::Immediate);
-
             let code = || -> Result<T, Error> {
-                let txn = conn.transaction()?;
+                let txn = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
                 let res = f(&txn)?;
                 txn.commit()?;
                 Ok(res)
             };
 
             let res = code();
-
-            // Reset the transaction behavior to use Deferred, after this transaction has
-            // been run, whether it was successful or not.
-            conn.set_transaction_behavior(TransactionBehavior::Deferred);
 
             res
         })
