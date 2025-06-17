@@ -1026,7 +1026,7 @@ impl IdentityManager {
         &self,
         timeout_duration: Duration,
         user_id: &'a UserId,
-    ) -> Result<Option<(&'a UserId, HashMap<OwnedDeviceId, DeviceData>)>, CryptoStoreError> {
+    ) -> Result<Option<(&'a UserId, HashMap<OwnedDeviceId, DeviceData>)>, crate::CryptoStoreError> {
         let cache = self.store.cache().await?;
         match self
             .key_query_manager
@@ -1046,7 +1046,7 @@ impl IdentityManager {
     async fn update_sender_data_from_device_changes(
         &self,
         device_changes: &DeviceChanges,
-    ) -> Result<(), CryptoStoreError> {
+    ) -> Result<(), crate::CryptoStoreError> {
         for device in device_changes.new.iter().chain(device_changes.changed.iter()) {
             // 1. Look for InboundGroupSessions from the device whose sender_data is
             //    UnknownDevice. For such sessions, we now have the device, and can update
@@ -1085,7 +1085,7 @@ impl IdentityManager {
         &self,
         device: &DeviceData,
         sender_data_type: SenderDataType,
-    ) -> Result<(), CryptoStoreError> {
+    ) -> Result<(), crate::CryptoStoreError> {
         const IGS_BATCH_SIZE: usize = 50;
 
         let Some(curve_key) = device.curve25519_key() else { return Ok(()) };
@@ -1123,7 +1123,7 @@ impl IdentityManager {
         &self,
         session: &mut InboundGroupSession,
         device: &DeviceData,
-    ) -> Result<(), CryptoStoreError> {
+    ) -> Result<(), crate::CryptoStoreError> {
         use crate::olm::sender_data_finder::SessionDeviceCheckError::*;
 
         match SenderDataFinder::find_using_device_data(&self.store, device.clone(), session).await {
