@@ -2736,22 +2736,15 @@ impl Room {
             None
         };
 
+        let data_clone_for_cache = store_in_cache.then(|| data.clone());
+
         #[cfg(feature = "e2e-encryption")]
         let (media_source, thumbnail) = if self.latest_encryption_state().await?.is_encrypted() {
-            self.client
-                .upload_encrypted_media_and_thumbnail(data.clone(), thumbnail, send_progress)
-                .await?
+            self.client.upload_encrypted_media_and_thumbnail(data, thumbnail, send_progress).await?
         } else {
             self.client
                 .media()
-                .upload_plain_media_and_thumbnail(
-                    content_type,
-                    // TODO: get rid of this clone; wait for Ruma to use `Bytes` or something
-                    // similar.
-                    data.clone(),
-                    thumbnail,
-                    send_progress,
-                )
+                .upload_plain_media_and_thumbnail(content_type, data, thumbnail, send_progress)
                 .await?
         };
 
@@ -2759,10 +2752,10 @@ impl Room {
         let (media_source, thumbnail) = self
             .client
             .media()
-            .upload_plain_media_and_thumbnail(content_type, data.clone(), thumbnail, send_progress)
+            .upload_plain_media_and_thumbnail(content_type, data, thumbnail, send_progress)
             .await?;
 
-        if store_in_cache {
+        if let Some(data) = data_clone_for_cache {
             let media_store_lock_guard = self.client.media_store().lock().await?;
 
             // A failure to cache shouldn't prevent the whole upload from finishing
