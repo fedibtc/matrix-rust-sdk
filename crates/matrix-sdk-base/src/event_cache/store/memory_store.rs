@@ -281,7 +281,7 @@ impl EventCacheStore for MemoryStore {
     async fn add_media_content(
         &self,
         request: &MediaRequestParameters,
-        data: Vec<u8>,
+        data: &[u8],
         ignore_policy: IgnoreMediaRetentionPolicy,
     ) -> Result<()> {
         self.media_service.add_media_content(self, request, data, ignore_policy).await
@@ -397,7 +397,7 @@ impl EventCacheStoreMedia for MemoryStore {
     async fn add_media_content_inner(
         &self,
         request: &MediaRequestParameters,
-        data: Vec<u8>,
+        data: &[u8],
         last_access: SystemTime,
         policy: MediaRetentionPolicy,
         ignore_policy: IgnoreMediaRetentionPolicy,
@@ -417,7 +417,7 @@ impl EventCacheStoreMedia for MemoryStore {
         inner.media.push(MediaContent {
             uri: request.uri().to_owned(),
             key: request.unique_key(),
-            data,
+            data: data.to_vec(),
             ignore_policy,
             last_access,
         });

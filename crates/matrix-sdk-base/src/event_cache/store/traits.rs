@@ -174,7 +174,7 @@ pub trait EventCacheStore: AsyncTraitDeps {
     async fn add_media_content(
         &self,
         request: &MediaRequestParameters,
-        content: Vec<u8>,
+        content: &[u8],
         ignore_policy: IgnoreMediaRetentionPolicy,
     ) -> Result<(), Self::Error>;
 
@@ -388,7 +388,7 @@ impl<T: EventCacheStore> EventCacheStore for EraseEventCacheStoreError<T> {
     async fn add_media_content(
         &self,
         request: &MediaRequestParameters,
-        content: Vec<u8>,
+        content: &[u8],
         ignore_policy: IgnoreMediaRetentionPolicy,
     ) -> Result<(), Self::Error> {
         self.0.add_media_content(request, content, ignore_policy).await.map_err(Into::into)

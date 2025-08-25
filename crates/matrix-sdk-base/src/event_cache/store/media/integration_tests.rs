@@ -103,7 +103,7 @@ where
 
         self.add_media_content_inner(
             &request_big,
-            content_big.clone(),
+            &content_big,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -112,7 +112,7 @@ where
         .unwrap();
         self.add_media_content_inner(
             &request_avg,
-            content_avg.clone(),
+            &content_avg,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -121,7 +121,7 @@ where
         .unwrap();
         self.add_media_content_inner(
             &request_small,
-            content_small,
+            &content_small,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -159,7 +159,7 @@ where
         // Caching big and average media doesn't work.
         self.add_media_content_inner(
             &request_big,
-            content_big.clone(),
+            &content_big,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -168,7 +168,7 @@ where
         .unwrap();
         self.add_media_content_inner(
             &request_avg,
-            content_avg.clone(),
+            &content_avg,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -189,7 +189,7 @@ where
         // Caching big doesn't work.
         self.add_media_content_inner(
             &request_big,
-            content_big.clone(),
+            &content_big,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -198,7 +198,7 @@ where
         .unwrap();
         self.add_media_content_inner(
             &request_avg,
-            content_avg.clone(),
+            &content_avg,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -227,7 +227,7 @@ where
         // Caching big and average media doesn't work.
         self.add_media_content_inner(
             &request_big,
-            content_big,
+            &content_big,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -236,7 +236,7 @@ where
         .unwrap();
         self.add_media_content_inner(
             &request_avg,
-            content_avg,
+            &content_avg,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -302,7 +302,7 @@ where
         let mut time = SystemTime::UNIX_EPOCH;
         self.add_media_content_inner(
             &request_big,
-            content_big,
+            &content_big,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -312,7 +312,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_small_1,
-            content_small.clone(),
+            &content_small,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -322,7 +322,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_small_2,
-            content_small.clone(),
+            &content_small,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -332,7 +332,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_small_3,
-            content_small.clone(),
+            &content_small,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -342,7 +342,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_small_4,
-            content_small.clone(),
+            &content_small,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -352,7 +352,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_small_5,
-            content_small.clone(),
+            &content_small,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -362,7 +362,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_avg,
-            content_avg,
+            &content_avg,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -420,7 +420,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_small_1,
-            content_small.clone(),
+            &content_small,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -430,7 +430,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_small_2,
-            content_small.clone(),
+            &content_small,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -440,7 +440,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_small_3,
-            content_small.clone(),
+            &content_small,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -450,7 +450,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_small_4,
-            content_small,
+            &content_small,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -531,7 +531,7 @@ where
         let mut time = SystemTime::UNIX_EPOCH;
         self.add_media_content_inner(
             &request_1,
-            content.clone(),
+            &content,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -541,7 +541,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_2,
-            content.clone(),
+            &content,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -551,7 +551,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_3,
-            content.clone(),
+            &content,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -561,7 +561,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_4,
-            content.clone(),
+            &content,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -571,7 +571,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_5,
-            content,
+            &content,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -681,7 +681,7 @@ where
         let mut time = SystemTime::UNIX_EPOCH;
         self.add_media_content_inner(
             &request_big,
-            content_big.clone(),
+            &content_big,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -696,7 +696,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_big,
-            content_big,
+            &content_big,
             time,
             policy,
             IgnoreMediaRetentionPolicy::Yes,
@@ -712,7 +712,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_small,
-            content_small.clone(),
+            &content_small,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -722,7 +722,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_avg,
-            content_avg,
+            &content_avg,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -823,7 +823,7 @@ where
         let mut time = SystemTime::UNIX_EPOCH;
         self.add_media_content_inner(
             &request_1,
-            content.clone(),
+            &content,
             time,
             policy,
             IgnoreMediaRetentionPolicy::Yes,
@@ -833,7 +833,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_2,
-            content.clone(),
+            &content,
             time,
             policy,
             IgnoreMediaRetentionPolicy::Yes,
@@ -843,7 +843,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_3,
-            content.clone(),
+            &content,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -853,7 +853,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_4,
-            content.clone(),
+            &content,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,
@@ -863,7 +863,7 @@ where
         time += Duration::from_secs(1);
         self.add_media_content_inner(
             &request_5,
-            content,
+            &content,
             time,
             policy,
             IgnoreMediaRetentionPolicy::No,

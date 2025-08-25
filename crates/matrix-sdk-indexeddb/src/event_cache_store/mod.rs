@@ -372,11 +372,11 @@ impl_event_cache_store! {
     async fn add_media_content(
         &self,
         request: &MediaRequestParameters,
-        content: Vec<u8>,
+        content: &[u8],
         ignore_policy: IgnoreMediaRetentionPolicy,
     ) -> Result<(), IndexeddbEventCacheStoreError> {
         self.memory_store
-            .add_media_content(request, content, ignore_policy)
+            .add_media_content(request, &content, ignore_policy)
             .await
             .map_err(IndexeddbEventCacheStoreError::MemoryStore)
     }

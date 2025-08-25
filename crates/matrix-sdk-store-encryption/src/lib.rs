@@ -463,6 +463,15 @@ impl StoreCipher {
         Ok(EncryptedValue { version: VERSION, ciphertext, nonce })
     }
 
+    pub fn encrypt_value_borrowed(&self, data: &[u8]) -> Result<EncryptedValue, Error> {
+        let nonce = Keys::get_nonce()?;
+        let cipher = XChaCha20Poly1305::new(self.inner.encryption_key());
+
+        let ciphertext = cipher.encrypt(XNonce::from_slice(&nonce), data.as_ref())?;
+
+        Ok(EncryptedValue { version: VERSION, ciphertext, nonce })
+    }
+
     /// Encrypt some data before it is inserted into the key/value store,
     /// using base64 for arrays of integers.
     ///

@@ -549,6 +549,15 @@ pub(crate) trait EncryptableStore {
         }
     }
 
+    fn encode_value_borrowed(&self, value: &[u8]) -> Result<Vec<u8>> {
+        if let Some(key) = self.get_cypher() {
+            let encrypted = key.encrypt_value_borrowed(value)?;
+            Ok(rmp_serde::to_vec_named(&encrypted)?)
+        } else {
+            Ok(value.to_owned())
+        }
+    }
+
     fn encode_value(&self, value: Vec<u8>) -> Result<Vec<u8>> {
         if let Some(key) = self.get_cypher() {
             let encrypted = key.encrypt_value_data(value)?;

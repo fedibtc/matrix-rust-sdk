@@ -192,7 +192,7 @@ impl EventCacheStoreIntegrationTests for DynEventCacheStore {
         );
 
         // Let's add the media.
-        self.add_media_content(&request_file, content.clone(), IgnoreMediaRetentionPolicy::No)
+        self.add_media_content(&request_file, &content, IgnoreMediaRetentionPolicy::No)
             .await
             .expect("adding media failed");
 
@@ -222,7 +222,7 @@ impl EventCacheStoreIntegrationTests for DynEventCacheStore {
         );
 
         // Let's add the media again.
-        self.add_media_content(&request_file, content.clone(), IgnoreMediaRetentionPolicy::No)
+        self.add_media_content(&request_file, &content, IgnoreMediaRetentionPolicy::No)
             .await
             .expect("adding media again failed");
 
@@ -235,7 +235,7 @@ impl EventCacheStoreIntegrationTests for DynEventCacheStore {
         // Let's add the thumbnail media.
         self.add_media_content(
             &request_thumbnail,
-            thumbnail_content.clone(),
+            &thumbnail_content,
             IgnoreMediaRetentionPolicy::No,
         )
         .await
@@ -255,13 +255,9 @@ impl EventCacheStoreIntegrationTests for DynEventCacheStore {
         );
 
         // Let's add another media with a different URI.
-        self.add_media_content(
-            &request_other_file,
-            other_content.clone(),
-            IgnoreMediaRetentionPolicy::No,
-        )
-        .await
-        .expect("adding other media failed");
+        self.add_media_content(&request_other_file, &other_content, IgnoreMediaRetentionPolicy::No)
+            .await
+            .expect("adding other media failed");
 
         // Other file is present.
         assert_eq!(
@@ -313,7 +309,7 @@ impl EventCacheStoreIntegrationTests for DynEventCacheStore {
         assert!(self.get_media_content(&req).await.unwrap().is_none(), "unexpected media found");
 
         // Add the media.
-        self.add_media_content(&req, content.clone(), IgnoreMediaRetentionPolicy::No)
+        self.add_media_content(&req, &content, IgnoreMediaRetentionPolicy::No)
             .await
             .expect("adding media failed");
 

@@ -2236,20 +2236,11 @@ impl Room {
 
         #[cfg(feature = "e2e-encryption")]
         let (media_source, thumbnail) = if self.latest_encryption_state().await?.is_encrypted() {
-            self.client
-                .upload_encrypted_media_and_thumbnail(&data, thumbnail, send_progress)
-                .await?
+            self.client.upload_encrypted_media_and_thumbnail(data, thumbnail, send_progress).await?
         } else {
             self.client
                 .media()
-                .upload_plain_media_and_thumbnail(
-                    content_type,
-                    // TODO: get rid of this clone; wait for Ruma to use `Bytes` or something
-                    // similar.
-                    data.clone(),
-                    thumbnail,
-                    send_progress,
-                )
+                .upload_plain_media_and_thumbnail(content_type, data, thumbnail, send_progress)
                 .await?
         };
 
@@ -2257,44 +2248,46 @@ impl Room {
         let (media_source, thumbnail) = self
             .client
             .media()
-            .upload_plain_media_and_thumbnail(content_type, data.clone(), thumbnail, send_progress)
+            .upload_plain_media_and_thumbnail(content_type, data, thumbnail, send_progress)
             .await?;
 
-        if store_in_cache {
-            let cache_store_lock_guard = self.client.event_cache_store().lock().await?;
+        // if store_in_cache {
+        //     let cache_store_lock_guard =
+        // self.client.event_cache_store().lock().await?;
 
-            // A failure to cache shouldn't prevent the whole upload from finishing
-            // properly, so only log errors during caching.
+        //     // A failure to cache shouldn't prevent the whole upload from finishing
+        //     // properly, so only log errors during caching.
 
-            debug!("caching the media");
-            let request =
-                MediaRequestParameters { source: media_source.clone(), format: MediaFormat::File };
+        //     debug!("caching the media");
+        //     let request =
+        //         MediaRequestParameters { source: media_source.clone(), format:
+        // MediaFormat::File };
 
-            if let Err(err) = cache_store_lock_guard
-                .add_media_content(&request, data, IgnoreMediaRetentionPolicy::No)
-                .await
-            {
-                warn!("unable to cache the media after uploading it: {err}");
-            }
+        //     if let Err(err) = cache_store_lock_guard
+        //         .add_media_content(&request, data, IgnoreMediaRetentionPolicy::No)
+        //         .await
+        //     {
+        //         warn!("unable to cache the media after uploading it: {err}");
+        //     }
 
-            if let Some(((data, height, width), source)) =
-                thumbnail_cache_info.zip(thumbnail.as_ref().map(|tuple| &tuple.0))
-            {
-                debug!("caching the thumbnail");
+        //     if let Some(((data, height, width), source)) =
+        //         thumbnail_cache_info.zip(thumbnail.as_ref().map(|tuple| &tuple.0))
+        //     {
+        //         debug!("caching the thumbnail");
 
-                let request = MediaRequestParameters {
-                    source: source.clone(),
-                    format: MediaFormat::Thumbnail(MediaThumbnailSettings::new(width, height)),
-                };
+        //         let request = MediaRequestParameters {
+        //             source: source.clone(),
+        //             format: MediaFormat::Thumbnail(MediaThumbnailSettings::new(width,
+        // height)),         };
 
-                if let Err(err) = cache_store_lock_guard
-                    .add_media_content(&request, data, IgnoreMediaRetentionPolicy::No)
-                    .await
-                {
-                    warn!("unable to cache the media after uploading it: {err}");
-                }
-            }
-        }
+        //         if let Err(err) = cache_store_lock_guard
+        //             .add_media_content(&request, data,
+        // IgnoreMediaRetentionPolicy::No)             .await
+        //         {
+        //             warn!("unable to cache the media after uploading it: {err}");
+        //         }
+        //     }
+        // }
 
         let content = self
             .make_media_event(
