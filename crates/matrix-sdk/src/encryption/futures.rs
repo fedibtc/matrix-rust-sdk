@@ -17,9 +17,10 @@
 
 #![deny(unreachable_pub)]
 
-use std::{future::IntoFuture, io::Read};
+use std::future::IntoFuture;
 
 use eyeball::{SharedObservable, Subscriber};
+use matrix_sdk_base::crypto::encrypt_attachment_in_place;
 use matrix_sdk_common::boxed_into_future;
 use ruma::events::room::EncryptedFile;
 
@@ -27,18 +28,18 @@ use crate::{Client, Media, Result, TransmissionProgress, config::RequestConfig};
 
 /// Future returned by [`Client::upload_encrypted_file`].
 #[allow(missing_debug_implementations)]
-pub struct UploadEncryptedFile<'a, R: ?Sized> {
+pub struct UploadEncryptedFile {
     client: Client,
-    reader: &'a mut R,
+    unencrypted_bytes: Vec<u8>,
     send_progress: SharedObservable<TransmissionProgress>,
     request_config: Option<RequestConfig>,
 }
 
-impl<'a, R: ?Sized> UploadEncryptedFile<'a, R> {
-    pub(crate) fn new(client: &Client, reader: &'a mut R) -> Self {
+impl UploadEncryptedFile {
+    pub(crate) fn new(client: &Client, unencrypted_bytes: Vec<u8>) -> Self {
         Self {
             client: client.clone(),
-            reader,
+            unencrypted_bytes,
             send_progress: Default::default(),
             request_config: None,
         }
@@ -74,36 +75,28 @@ impl<'a, R: ?Sized> UploadEncryptedFile<'a, R> {
     }
 }
 
-impl<'a, R> IntoFuture for UploadEncryptedFile<'a, R>
-where
-    R: Read + Send + ?Sized + 'a,
-{
+impl IntoFuture for UploadEncryptedFile {
     type Output = Result<EncryptedFile>;
-    boxed_into_future!(extra_bounds: 'a);
+    boxed_into_future!();
 
     fn into_future(self) -> Self::IntoFuture {
-        let Self { client, reader, send_progress, request_config } = self;
+        let Self { client, mut unencrypted_bytes, send_progress, request_config } = self;
+        let info = encrypt_attachment_in_place(&mut unencrypted_bytes);
+        let encrypted_bytes = unencrypted_bytes; // got encrypted in place
         Box::pin(async move {
-            let mut encryptor = matrix_sdk_base::crypto::AttachmentEncryptor::new(reader);
-
-            let mut buf = Vec::new();
-            encryptor.read_to_end(&mut buf)?;
-
             // Override the reasonable upload timeout value, based on the size of the
             // encrypted payload.
-            let request_config =
-                request_config.map(|config| config.timeout(Media::reasonable_upload_timeout(&buf)));
+            let request_config = request_config
+                .map(|config| config.timeout(Media::reasonable_upload_timeout(&encrypted_bytes)));
 
             let response = client
                 .media()
-                .upload(&mime::APPLICATION_OCTET_STREAM, buf, request_config)
+                .upload(&mime::APPLICATION_OCTET_STREAM, encrypted_bytes, request_config)
                 .with_send_progress_observable(send_progress)
                 .await?;
 
-            let file: EncryptedFile = {
-                let keys = encryptor.finish();
-                EncryptedFile::new(response.content_uri, keys.encryption_info, keys.hashes)
-            };
+            let file: EncryptedFile =
+                { EncryptedFile::new(response.content_uri, info.encryption_info, info.hashes) };
 
             Ok(file)
         })
