@@ -777,10 +777,9 @@ impl RoomSendQueue {
                     #[cfg(feature = "e2e-encryption")]
                     let media_source = if room.latest_encryption_state().await?.is_encrypted() {
                         trace!("upload will be encrypted (encrypted room)");
-                        let mut cursor = std::io::Cursor::new(data);
                         let encrypted_file = room
                             .client()
-                            .upload_encrypted_file(&mut cursor)
+                            .upload_encrypted_file(data)
                             .with_request_config(RequestConfig::short_retry())
                             .await?;
                         MediaSource::Encrypted(Box::new(encrypted_file))
