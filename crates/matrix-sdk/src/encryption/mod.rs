@@ -20,7 +20,7 @@
 use std::ops::Deref;
 use std::{
     collections::{BTreeMap, HashSet},
-    io::{Cursor, Read, Write},
+    io::Write,
     iter,
     path::PathBuf,
     str::FromStr,
@@ -501,28 +501,22 @@ impl Client {
     /// room.send(CustomEventContent { encrypted_file }).await?;
     /// # anyhow::Ok(()) };
     /// ```
-    pub fn upload_encrypted_file<'a, R: Read + ?Sized + 'a>(
-        &'a self,
-        reader: &'a mut R,
-    ) -> UploadEncryptedFile<'a, R> {
-        UploadEncryptedFile::new(self, reader)
+    pub fn upload_encrypted_file(&self, bytes: Vec<u8>) -> UploadEncryptedFile {
+        UploadEncryptedFile::new(self, bytes)
     }
 
     /// Encrypt and upload the file and thumbnails, and return the source
     /// information.
     pub(crate) async fn upload_encrypted_media_and_thumbnail(
         &self,
-        data: &[u8],
+        data: Vec<u8>,
         thumbnail: Option<Thumbnail>,
         send_progress: SharedObservable<TransmissionProgress>,
     ) -> Result<(MediaSource, Option<(MediaSource, Box<ThumbnailInfo>)>)> {
         let upload_thumbnail = self.upload_encrypted_thumbnail(thumbnail, send_progress.clone());
 
         let upload_attachment = async {
-            let mut cursor = Cursor::new(data);
-            self.upload_encrypted_file(&mut cursor)
-                .with_send_progress_observable(send_progress)
-                .await
+            self.upload_encrypted_file(data).with_send_progress_observable(send_progress).await
         };
 
         let (thumbnail, file) = try_join(upload_thumbnail, upload_attachment).await?;
@@ -542,12 +536,8 @@ impl Client {
         };
 
         let (data, _, thumbnail_info) = thumbnail.into_parts();
-        let mut cursor = Cursor::new(data);
-
-        let file = self
-            .upload_encrypted_file(&mut cursor)
-            .with_send_progress_observable(send_progress)
-            .await?;
+        let file =
+            self.upload_encrypted_file(data).with_send_progress_observable(send_progress).await?;
 
         Ok(Some((MediaSource::Encrypted(Box::new(file)), thumbnail_info)))
     }
