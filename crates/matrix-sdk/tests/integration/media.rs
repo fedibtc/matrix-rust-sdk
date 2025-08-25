@@ -41,7 +41,7 @@ async fn test_get_media_content_no_auth() {
             .mount_as_scoped()
             .await;
 
-        assert_eq!(media.get_media_content(&request, false).await.unwrap(), expected_content);
+        assert_eq!(&*media.get_media_content(&request, false).await.unwrap(), expected_content);
     }
 
     // Second time, without the cache, error from the HTTP server.
@@ -67,7 +67,7 @@ async fn test_get_media_content_no_auth() {
             .mount_as_scoped()
             .await;
 
-        assert_eq!(media.get_media_content(&request, true).await.unwrap(), expected_content);
+        assert_eq!(&*media.get_media_content(&request, true).await.unwrap(), expected_content);
     }
 
     // Third time, with the cache, the HTTP server isn't reached.
@@ -81,7 +81,7 @@ async fn test_get_media_content_no_auth() {
             .await;
 
         assert_eq!(
-            client.media().get_media_content(&request, true).await.unwrap(),
+            &*client.media().get_media_content(&request, true).await.unwrap(),
             expected_content
         );
     }
@@ -317,7 +317,7 @@ async fn test_async_media_upload() {
 
     client
         .media()
-        .upload_preallocated(mxc_uri, &mime::IMAGE_JPEG, b"hello world".to_vec())
+        .upload_preallocated(mxc_uri, &mime::IMAGE_JPEG, b"hello world".to_vec().into())
         .await
         .unwrap();
 }

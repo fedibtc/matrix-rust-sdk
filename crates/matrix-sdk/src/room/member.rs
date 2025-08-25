@@ -1,5 +1,6 @@
 use std::ops::Deref;
 
+use bytes::Bytes;
 use ruma::events::room::MediaSource;
 
 use crate::{
@@ -59,7 +60,7 @@ impl RoomMember {
     /// }
     /// # };
     /// ```
-    pub async fn avatar(&self, format: MediaFormat) -> Result<Option<Vec<u8>>> {
+    pub async fn avatar(&self, format: MediaFormat) -> Result<Option<Bytes>> {
         let Some(url) = self.avatar_url() else { return Ok(None) };
         let request = MediaRequestParameters { source: MediaSource::Plain(url.to_owned()), format };
         Ok(Some(self.client.media().get_media_content(&request, true).await?))

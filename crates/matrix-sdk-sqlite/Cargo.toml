@@ -22,6 +22,7 @@ state-store = ["dep:matrix-sdk-base"]
 [dependencies]
 as_variant.workspace = true
 async-trait.workspace = true
+bytes = "1.9.0"
 deadpool-sqlite = "0.8.0"
 itertools.workspace = true
 matrix-sdk-base = { workspace = true, optional = true }

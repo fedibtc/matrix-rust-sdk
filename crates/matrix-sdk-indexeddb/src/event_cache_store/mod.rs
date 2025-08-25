@@ -14,6 +14,7 @@
 
 #![allow(unused)]
 
+use bytes::Bytes;
 use indexed_db_futures::IdbDatabase;
 use matrix_sdk_base::{
     event_cache::{
@@ -372,7 +373,7 @@ impl_event_cache_store! {
     async fn add_media_content(
         &self,
         request: &MediaRequestParameters,
-        content: Vec<u8>,
+        content: Bytes,
         ignore_policy: IgnoreMediaRetentionPolicy,
     ) -> Result<(), IndexeddbEventCacheStoreError> {
         self.memory_store
@@ -395,7 +396,7 @@ impl_event_cache_store! {
     async fn get_media_content(
         &self,
         request: &MediaRequestParameters,
-    ) -> Result<Option<Vec<u8>>, IndexeddbEventCacheStoreError> {
+    ) -> Result<Option<Bytes>, IndexeddbEventCacheStoreError> {
         self.memory_store
             .get_media_content(request)
             .await
@@ -415,7 +416,7 @@ impl_event_cache_store! {
     async fn get_media_content_for_uri(
         &self,
         uri: &MxcUri,
-    ) -> Result<Option<Vec<u8>>, IndexeddbEventCacheStoreError> {
+    ) -> Result<Option<Bytes>, IndexeddbEventCacheStoreError> {
         self.memory_store
             .get_media_content_for_uri(uri)
             .await

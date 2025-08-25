@@ -29,6 +29,7 @@ growable-bloom-filter = { workspace = true, optional = true }
 hkdf.workspace = true
 indexed_db_futures = "0.5.0"
 js-sys.workspace = true
+bytes = "1.9.0"
 matrix-sdk-base = { workspace = true, features = ["js"], optional = true }
 matrix-sdk-crypto = { workspace = true, features = ["js"], optional = true }
 matrix-sdk-store-encryption.workspace = true

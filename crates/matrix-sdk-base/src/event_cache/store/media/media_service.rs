@@ -15,6 +15,7 @@
 use std::{fmt, sync::Arc};
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use matrix_sdk_common::{
     executor::{spawn, JoinHandle},
     locks::Mutex,
@@ -160,7 +161,7 @@ where
         &self,
         store: &Store,
         request: &MediaRequestParameters,
-        content: Vec<u8>,
+        content: Bytes,
         ignore_policy: IgnoreMediaRetentionPolicy,
     ) -> Result<(), Store::Error> {
         let policy = self.media_retention_policy();
@@ -215,7 +216,7 @@ where
         &self,
         store: &Store,
         request: &MediaRequestParameters,
-    ) -> Result<Option<Vec<u8>>, Store::Error> {
+    ) -> Result<Option<Bytes>, Store::Error> {
         let current_time = self.now();
         let content = store.get_media_content_inner(request, current_time).await?;
 
@@ -236,7 +237,7 @@ where
         &self,
         store: &Store,
         uri: &MxcUri,
-    ) -> Result<Option<Vec<u8>>, Store::Error> {
+    ) -> Result<Option<Bytes>, Store::Error> {
         let current_time = self.now();
         let content = store.get_media_content_for_uri_inner(uri, current_time).await?;
 
@@ -397,7 +398,7 @@ pub trait EventCacheStoreMedia: AsyncTraitDeps + Clone {
     async fn add_media_content_inner(
         &self,
         request: &MediaRequestParameters,
-        content: Vec<u8>,
+        content: Bytes,
         current_time: SystemTime,
         policy: MediaRetentionPolicy,
         ignore_policy: IgnoreMediaRetentionPolicy,
@@ -434,7 +435,7 @@ pub trait EventCacheStoreMedia: AsyncTraitDeps + Clone {
         &self,
         request: &MediaRequestParameters,
         current_time: SystemTime,
-    ) -> Result<Option<Vec<u8>>, Self::Error>;
+    ) -> Result<Option<Bytes>, Self::Error>;
 
     /// Get a media file's content associated to an `MxcUri` from the
     /// media store.
@@ -449,7 +450,7 @@ pub trait EventCacheStoreMedia: AsyncTraitDeps + Clone {
         &self,
         uri: &MxcUri,
         current_time: SystemTime,
-    ) -> Result<Option<Vec<u8>>, Self::Error>;
+    ) -> Result<Option<Bytes>, Self::Error>;
 
     /// Clean up the media cache with the given policy.
     ///
@@ -535,6 +536,7 @@ mod tests {
     };
 
     use async_trait::async_trait;
+    use bytes::Bytes;
     use matrix_sdk_common::locks::Mutex;
     use matrix_sdk_test::async_test;
     use ruma::{
@@ -603,7 +605,7 @@ mod tests {
         uri: OwnedMxcUri,
 
         /// The media content.
-        content: Vec<u8>,
+        content: Bytes,
 
         /// Whether the `MediaRetentionPolicy` should be ignored for this media
         /// content;
@@ -652,7 +654,7 @@ mod tests {
         async fn add_media_content_inner(
             &self,
             request: &MediaRequestParameters,
-            content: Vec<u8>,
+            content: Bytes,
             current_time: SystemTime,
             policy: MediaRetentionPolicy,
             ignore_policy: IgnoreMediaRetentionPolicy,
@@ -703,7 +705,7 @@ mod tests {
             &self,
             request: &MediaRequestParameters,
             current_time: SystemTime,
-        ) -> Result<Option<Vec<u8>>, Self::Error> {
+        ) -> Result<Option<Bytes>, Self::Error> {
             let key = request.unique_key();
             let mut inner = self.inner();
 
@@ -722,7 +724,7 @@ mod tests {
             &self,
             uri: &MxcUri,
             current_time: SystemTime,
-        ) -> Result<Option<Vec<u8>>, Self::Error> {
+        ) -> Result<Option<Bytes>, Self::Error> {
             let mut inner = self.inner();
 
             let Some(media_content) =
@@ -798,14 +800,19 @@ mod tests {
 
         // Add media.
         service
-            .add_media_content(&store, &request, content.to_vec(), IgnoreMediaRetentionPolicy::No)
+            .add_media_content(
+                &store,
+                &request,
+                Bytes::copy_from_slice(content),
+                IgnoreMediaRetentionPolicy::No,
+            )
             .await
             .unwrap();
         assert!(store.accessed());
 
         let media_content = store.inner().media_list[0].clone();
         assert_eq!(media_content.uri, uri);
-        assert_eq!(media_content.content, content);
+        assert_eq!(&*media_content.content, content);
         assert!(!media_content.ignore_policy);
         assert_eq!(media_content.last_access, now);
 
@@ -899,7 +906,7 @@ mod tests {
             .add_media_content(
                 &store,
                 &small_request,
-                small_content.to_vec(),
+                Bytes::copy_from_slice(small_content),
                 IgnoreMediaRetentionPolicy::No,
             )
             .await
@@ -908,7 +915,7 @@ mod tests {
 
         let media_content = store.inner().media_list[0].clone();
         assert_eq!(media_content.uri, small_uri);
-        assert_eq!(media_content.content, small_content);
+        assert_eq!(&*media_content.content, small_content);
         assert!(!media_content.ignore_policy);
         assert_eq!(media_content.last_access, now);
 
@@ -947,7 +954,7 @@ mod tests {
             .add_media_content(
                 &store,
                 &big_request,
-                big_content.to_vec(),
+                Bytes::copy_from_slice(big_content),
                 IgnoreMediaRetentionPolicy::No,
             )
             .await
@@ -972,7 +979,7 @@ mod tests {
             .add_media_content(
                 &store,
                 &big_request,
-                big_content.to_vec(),
+                Bytes::copy_from_slice(big_content),
                 IgnoreMediaRetentionPolicy::Yes,
             )
             .await
@@ -1019,7 +1026,7 @@ mod tests {
     #[async_test]
     async fn test_media_service_automatic_cleanup() {
         // 64 bytes content.
-        let content = vec![0; 64];
+        let content: Bytes = vec![0; 64].into();
 
         let uri_1 = mxc_uri!("mxc://localhost/media-1");
         let request_1 = MediaRequestParameters {

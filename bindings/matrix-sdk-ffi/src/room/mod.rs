@@ -552,7 +552,7 @@ impl Room {
         self.inner
             .upload_avatar(
                 &mime,
-                data,
+                data.into(),
                 media_info
                     .map(TryInto::try_into)
                     .transpose()

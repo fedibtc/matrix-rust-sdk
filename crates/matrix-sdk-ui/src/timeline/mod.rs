@@ -29,6 +29,7 @@ use imbl::Vector;
 use matrix_sdk::attachment::{AttachmentInfo, Thumbnail};
 use matrix_sdk::{
     attachment::AttachmentConfig,
+    bytes::Bytes,
     deserialized_responses::TimelineEvent,
     event_cache::{EventCacheDropHandles, RoomEventCache},
     executor::JoinHandle,
@@ -811,7 +812,7 @@ pub enum AttachmentSource {
     /// The data of the attachment.
     Data {
         /// The bytes of the attachment.
-        bytes: Vec<u8>,
+        bytes: Bytes,
 
         /// The filename of the attachment.
         filename: String,
@@ -825,7 +826,7 @@ pub enum AttachmentSource {
 
 impl AttachmentSource {
     /// Try to convert this attachment source into a `(bytes, filename)` tuple.
-    pub(crate) fn try_into_bytes_and_filename(self) -> Result<(Vec<u8>, String), Error> {
+    pub(crate) fn try_into_bytes_and_filename(self) -> Result<(Bytes, String), Error> {
         match self {
             Self::Data { bytes, filename } => Ok((bytes, filename)),
             Self::File(path) => {
@@ -836,7 +837,7 @@ impl AttachmentSource {
                     .ok_or(Error::InvalidAttachmentFileName)?
                     .to_owned();
                 let bytes = fs::read(&path).map_err(|_| Error::InvalidAttachmentData)?;
-                Ok((bytes, filename))
+                Ok((bytes.into(), filename))
             }
         }
     }

@@ -15,6 +15,7 @@
 //! Trait and macro of integration tests for `EventCacheStoreMedia`
 //! implementations.
 
+use bytes::Bytes;
 use ruma::{
     events::room::MediaSource,
     mxc_uri, owned_mxc_uri,
@@ -75,7 +76,7 @@ where
         let time = SystemTime::now();
 
         // 256 bytes content.
-        let content_big = vec![0; 256];
+        let content_big: Bytes = vec![0; 256].into();
         let uri_big = owned_mxc_uri!("mxc://localhost/big-media");
         let request_big = MediaRequestParameters {
             source: MediaSource::Plain(uri_big),
@@ -83,7 +84,7 @@ where
         };
 
         // 128 bytes content.
-        let content_avg = vec![0; 128];
+        let content_avg: Bytes = vec![0; 128].into();
         let uri_avg = owned_mxc_uri!("mxc://localhost/average-media");
         let request_avg = MediaRequestParameters {
             source: MediaSource::Plain(uri_avg),
@@ -91,7 +92,7 @@ where
         };
 
         // 64 bytes content.
-        let content_small = vec![0; 64];
+        let content_small: Bytes = vec![0; 64].into();
         let uri_small = owned_mxc_uri!("mxc://localhost/small-media");
         let request_small = MediaRequestParameters {
             source: MediaSource::Plain(uri_small),
@@ -252,7 +253,7 @@ where
 
     async fn test_media_max_cache_size(&self) {
         // 256 bytes content.
-        let content_big = vec![0; 256];
+        let content_big: Bytes = vec![0; 256].into();
         let uri_big = owned_mxc_uri!("mxc://localhost/big-media");
         let request_big = MediaRequestParameters {
             source: MediaSource::Plain(uri_big),
@@ -260,7 +261,7 @@ where
         };
 
         // 128 bytes content.
-        let content_avg = vec![0; 128];
+        let content_avg: Bytes = vec![0; 128].into();
         let uri_avg = mxc_uri!("mxc://localhost/average-media");
         let request_avg = MediaRequestParameters {
             source: MediaSource::Plain(uri_avg.to_owned()),
@@ -268,7 +269,7 @@ where
         };
 
         // 64 bytes content.
-        let content_small = vec![0; 64];
+        let content_small: Bytes = vec![0; 64].into();
         let uri_small_1 = owned_mxc_uri!("mxc://localhost/small-media-1");
         let request_small_1 = MediaRequestParameters {
             source: MediaSource::Plain(uri_small_1),
@@ -505,7 +506,7 @@ where
 
     async fn test_media_expiry(&self) {
         // 64 bytes content.
-        let content = vec![0; 64];
+        let content: Bytes = vec![0; 64].into();
 
         let uri_1 = owned_mxc_uri!("mxc://localhost/media-1");
         let request_1 =
@@ -650,7 +651,7 @@ where
 
     async fn test_media_ignore_max_size(&self) {
         // 256 bytes content.
-        let content_big = vec![0; 256];
+        let content_big: Bytes = vec![0; 256].into();
         let uri_big = owned_mxc_uri!("mxc://localhost/big-media");
         let request_big = MediaRequestParameters {
             source: MediaSource::Plain(uri_big),
@@ -658,7 +659,7 @@ where
         };
 
         // 128 bytes content.
-        let content_avg = vec![0; 128];
+        let content_avg: Bytes = vec![0; 128].into();
         let uri_avg = mxc_uri!("mxc://localhost/average-media");
         let request_avg = MediaRequestParameters {
             source: MediaSource::Plain(uri_avg.to_owned()),
@@ -666,7 +667,7 @@ where
         };
 
         // 64 bytes content.
-        let content_small = vec![0; 64];
+        let content_small: Bytes = vec![0; 64].into();
         let uri_small = owned_mxc_uri!("mxc://localhost/small-media-1");
         let request_small = MediaRequestParameters {
             source: MediaSource::Plain(uri_small),
@@ -797,7 +798,7 @@ where
 
     async fn test_media_ignore_expiry(&self) {
         // 64 bytes content.
-        let content = vec![0; 64];
+        let content: Bytes = vec![0; 64].into();
 
         let uri_1 = owned_mxc_uri!("mxc://localhost/media-1");
         let request_1 =

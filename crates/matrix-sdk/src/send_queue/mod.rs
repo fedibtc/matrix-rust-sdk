@@ -788,8 +788,11 @@ impl RoomSendQueue {
                         trace!("upload will be in clear text (room without encryption)");
                         let request_config = RequestConfig::short_retry()
                             .timeout(Media::reasonable_upload_timeout(&data));
-                        let res =
-                            room.client().media().upload(&mime, data, Some(request_config)).await?;
+                        let res = room
+                            .client()
+                            .media()
+                            .upload(&mime, data.into(), Some(request_config))
+                            .await?;
                         MediaSource::Plain(res.content_uri)
                     };
 
@@ -797,8 +800,11 @@ impl RoomSendQueue {
                     let media_source = {
                         let request_config = RequestConfig::short_retry()
                             .timeout(Media::reasonable_upload_timeout(&data));
-                        let res =
-                            room.client().media().upload(&mime, data, Some(request_config)).await?;
+                        let res = room
+                            .client()
+                            .media()
+                            .upload(&mime, data.into(), Some(request_config))
+                            .await?;
                         MediaSource::Plain(res.content_uri)
                     };
 

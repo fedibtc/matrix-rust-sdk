@@ -899,7 +899,7 @@ impl Client {
 
     pub async fn upload_avatar(&self, mime_type: String, data: Vec<u8>) -> Result<(), ClientError> {
         let mime: Mime = mime_type.parse()?;
-        self.inner.account().upload_avatar(&mime, data).await?;
+        self.inner.account().upload_avatar(&mime, data.into()).await?;
         Ok(())
     }
 
@@ -960,7 +960,7 @@ impl Client {
         progress_watcher: Option<Box<dyn ProgressWatcher>>,
     ) -> Result<String, ClientError> {
         let mime_type: mime::Mime = mime_type.parse().context("Parsing mime type")?;
-        let request = self.inner.media().upload(&mime_type, data, None);
+        let request = self.inner.media().upload(&mime_type, data.into(), None);
 
         if let Some(progress_watcher) = progress_watcher {
             let mut subscriber = request.subscribe_to_send_progress();
@@ -987,7 +987,8 @@ impl Client {
             .inner
             .media()
             .get_media_content(&MediaRequestParameters { source, format: MediaFormat::File }, true)
-            .await?)
+            .await?
+            .to_vec())
     }
 
     pub async fn get_media_thumbnail(
@@ -1012,7 +1013,9 @@ impl Client {
                 },
                 true,
             )
-            .await?)
+            .await?
+            // warning: clones
+            .to_vec())
     }
 
     pub async fn get_session_verification_controller(

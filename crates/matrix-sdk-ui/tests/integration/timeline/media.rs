@@ -23,6 +23,7 @@ use matrix_sdk::attachment::{AttachmentInfo, BaseFileInfo};
 use matrix_sdk::{
     assert_let_timeout,
     attachment::AttachmentConfig,
+    bytes::Bytes,
     room::reply::{EnforceThread, Reply},
     test_utils::mocks::MatrixMockServer,
 };
@@ -205,8 +206,10 @@ async fn test_send_attachment_from_bytes() {
 
     // The data of the file.
     let filename = "test.bin";
-    let source =
-        AttachmentSource::Data { bytes: b"hello world".to_vec(), filename: filename.to_owned() };
+    let source = AttachmentSource::Data {
+        bytes: Bytes::from_static(b"hello world"),
+        filename: filename.to_owned(),
+    };
 
     // Set up mocks for the file upload.
     mock.mock_upload()
@@ -312,7 +315,7 @@ async fn test_send_gallery_from_bytes() {
 
     // The data of the file.
     let filename = "test.bin";
-    let data = b"hello world".to_vec();
+    let data = Bytes::from_static(b"hello world");
 
     // Set up mocks for the file upload.
     mock.mock_upload()

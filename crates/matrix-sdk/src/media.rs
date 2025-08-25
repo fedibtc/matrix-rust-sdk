@@ -21,6 +21,7 @@ use std::time::Duration;
 #[cfg(not(target_family = "wasm"))]
 use std::{fmt, fs::File, path::Path};
 
+use bytes::Bytes;
 use eyeball::SharedObservable;
 use futures_util::future::try_join;
 use matrix_sdk_base::event_cache::store::media::IgnoreMediaRetentionPolicy;
@@ -145,8 +146,7 @@ pub enum MediaError {
 
     /// The provided media is too large to upload.
     #[error(
-        "The provided media is too large to upload. \
-         Maximum upload length is {max} bytes, tried to upload {current} bytes"
+        "The provided media is too large to upload. \n        Maximum upload length is {max} bytes, tried to upload {current} bytes"
     )]
     MediaTooLargeToUpload {
         /// The `max_upload_size` value for this homeserver.
@@ -191,7 +191,7 @@ impl Media {
     /// let image = fs::read("/home/example/my-cat.jpg")?;
     ///
     /// let response =
-    ///     client.media().upload(&mime::IMAGE_JPEG, image, None).await?;
+    ///     client.media().upload(&mime::IMAGE_JPEG, image.into(), None).await?;
     ///
     /// println!("Cat URI: {}", response.content_uri);
     /// # anyhow::Ok(()) };
@@ -199,7 +199,7 @@ impl Media {
     pub fn upload(
         &self,
         content_type: &Mime,
-        data: Vec<u8>,
+        data: Bytes,
         request_config: Option<RequestConfig>,
     ) -> SendMediaUploadRequest {
         let request_config = request_config.unwrap_or_else(|| {
@@ -418,7 +418,7 @@ impl Media {
         &self,
         request: &MediaRequestParameters,
         use_cache: bool,
-    ) -> Result<Vec<u8>> {
+    ) -> Result<Bytes> {
         // Ignore request parameters for local medias, notably those pending in the send
         // queue.
         if let Some(uri) = Self::as_local_uri(&request.source) {
@@ -448,7 +448,7 @@ impl Media {
                 (false, None)
             };
 
-        let content: Vec<u8> = match &request.source {
+        let content: Bytes = match &request.source {
             MediaSource::Encrypted(file) => {
                 let content = if use_auth {
                     let request =
@@ -475,7 +475,7 @@ impl Media {
 
                     reader.read_to_end(&mut decrypted)?;
 
-                    decrypted
+                    decrypted.into()
                 };
 
                 content
@@ -493,7 +493,12 @@ impl Media {
                         request.method = Some(settings.method.clone());
                         request.animated = Some(settings.animated);
 
-                        self.client.send(request).with_request_config(request_config).await?.file
+                        self.client
+                            .send(request)
+                            .with_request_config(request_config)
+                            .await?
+                            .file
+                            .into()
                     } else {
                         #[allow(deprecated)]
                         let request = {
@@ -507,15 +512,15 @@ impl Media {
                             request
                         };
 
-                        self.client.send(request).await?.file
+                        self.client.send(request).await?.file.into()
                     }
                 } else if use_auth {
                     let request = authenticated_media::get_content::v1::Request::from_uri(uri)?;
-                    self.client.send(request).with_request_config(request_config).await?.file
+                    self.client.send(request).with_request_config(request_config).await?.file.into()
                 } else {
                     #[allow(deprecated)]
                     let request = media::get_content::v3::Request::from_url(uri)?;
-                    self.client.send(request).await?.file
+                    self.client.send(request).await?.file.into()
                 }
             }
         };
@@ -537,7 +542,7 @@ impl Media {
     /// # Arguments
     ///
     /// * `uri` - The local MXC URI of the media content.
-    async fn get_local_media_content(&self, uri: &MxcUri) -> Result<Vec<u8>> {
+    async fn get_local_media_content(&self, uri: &MxcUri) -> Result<Bytes> {
         // Read from the cache.
         self.client
             .event_cache_store()
@@ -586,7 +591,7 @@ impl Media {
         &self,
         event_content: &impl MediaEventContent,
         use_cache: bool,
-    ) -> Result<Option<Vec<u8>>> {
+    ) -> Result<Option<Bytes>> {
         let Some(source) = event_content.source() else { return Ok(None) };
         let file = self
             .get_media_content(
@@ -640,7 +645,7 @@ impl Media {
         event_content: &impl MediaEventContent,
         settings: MediaThumbnailSettings,
         use_cache: bool,
-    ) -> Result<Option<Vec<u8>>> {
+    ) -> Result<Option<Bytes>> {
         let Some(source) = event_content.thumbnail_source() else { return Ok(None) };
         let thumbnail = self
             .get_media_content(
@@ -672,7 +677,7 @@ impl Media {
                 source,
                 format: MediaFormat::Thumbnail(settings),
             })
-            .await?
+            .await?;
         }
 
         Ok(())
@@ -720,7 +725,7 @@ impl Media {
     pub(crate) async fn upload_plain_media_and_thumbnail(
         &self,
         content_type: &Mime,
-        data: Vec<u8>,
+        data: Bytes,
         thumbnail: Option<Thumbnail>,
         send_progress: SharedObservable<TransmissionProgress>,
     ) -> Result<(MediaSource, Option<(MediaSource, Box<ThumbnailInfo>)>)> {
@@ -749,7 +754,7 @@ impl Media {
         let (data, content_type, thumbnail_info) = thumbnail.into_parts();
 
         let response = self
-            .upload(&content_type, data, None)
+            .upload(&content_type, data.into(), None)
             .with_send_progress_observable(send_progress)
             .await?;
         let url = response.content_uri;

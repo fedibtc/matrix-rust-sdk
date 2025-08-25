@@ -17,6 +17,7 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use assert_matches::assert_matches;
+use bytes::Bytes;
 use matrix_sdk_common::{
     deserialized_responses::{
         AlgorithmInfo, DecryptedRoomEvent, EncryptionInfo, TimelineEvent, TimelineEventKind,
@@ -177,9 +178,9 @@ impl EventCacheStoreIntegrationTests for DynEventCacheStore {
             format: MediaFormat::File,
         };
 
-        let content: Vec<u8> = "hello".into();
-        let thumbnail_content: Vec<u8> = "world".into();
-        let other_content: Vec<u8> = "foo".into();
+        let content: Bytes = "hello".into();
+        let thumbnail_content: Bytes = "world".into();
+        let other_content: Bytes = "foo".into();
 
         // Media isn't present in the cache.
         assert!(
@@ -307,7 +308,7 @@ impl EventCacheStoreIntegrationTests for DynEventCacheStore {
             format: MediaFormat::File,
         };
 
-        let content = "hello".as_bytes().to_owned();
+        let content: Bytes = "hello".as_bytes().into();
 
         // Media isn't present in the cache.
         assert!(self.get_media_content(&req).await.unwrap().is_none(), "unexpected media found");
@@ -318,7 +319,7 @@ impl EventCacheStoreIntegrationTests for DynEventCacheStore {
             .expect("adding media failed");
 
         // Sanity-check: media is found after adding it.
-        assert_eq!(self.get_media_content(&req).await.unwrap().unwrap(), b"hello");
+        assert_eq!(&*self.get_media_content(&req).await.unwrap().unwrap(), b"hello");
 
         // Replacing a media request works.
         let new_uri = mxc_uri!("mxc://matrix.org/tr4n-s4ct-10n1-d");
@@ -337,7 +338,7 @@ impl EventCacheStoreIntegrationTests for DynEventCacheStore {
         );
 
         // Finding with the new request does work.
-        assert_eq!(self.get_media_content(&new_req).await.unwrap().unwrap(), b"hello");
+        assert_eq!(&*self.get_media_content(&new_req).await.unwrap().unwrap(), b"hello");
     }
 
     async fn test_handle_updates_and_rebuild_linked_chunk(&self) {

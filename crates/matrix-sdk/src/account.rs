@@ -14,6 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use bytes::Bytes;
 use futures_core::Stream;
 use futures_util::{stream, StreamExt};
 use matrix_sdk_base::{
@@ -227,7 +228,7 @@ impl Account {
     /// }
     /// # anyhow::Ok(()) };
     /// ```
-    pub async fn get_avatar(&self, format: MediaFormat) -> Result<Option<Vec<u8>>> {
+    pub async fn get_avatar(&self, format: MediaFormat) -> Result<Option<Bytes>> {
         if let Some(url) = self.get_avatar_url().await? {
             let request = MediaRequestParameters { source: MediaSource::Plain(url), format };
             Ok(Some(self.client.media().get_media_content(&request, true).await?))
@@ -258,12 +259,12 @@ impl Account {
     /// # let client = Client::new(homeserver).await?;
     /// let image = fs::read("/home/example/selfie.jpg")?;
     ///
-    /// client.account().upload_avatar(&mime::IMAGE_JPEG, image).await?;
+    /// client.account().upload_avatar(&mime::IMAGE_JPEG, image.into()).await?;
     /// # anyhow::Ok(()) };
     /// ```
     ///
     /// [`Media::upload()`]: crate::Media::upload
-    pub async fn upload_avatar(&self, content_type: &Mime, data: Vec<u8>) -> Result<OwnedMxcUri> {
+    pub async fn upload_avatar(&self, content_type: &Mime, data: Bytes) -> Result<OwnedMxcUri> {
         let upload_response = self.client.media().upload(content_type, data, None).await?;
         self.set_avatar_url(Some(&upload_response.content_uri)).await?;
         Ok(upload_response.content_uri)

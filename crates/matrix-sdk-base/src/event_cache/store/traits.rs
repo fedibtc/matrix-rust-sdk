@@ -15,6 +15,7 @@
 use std::{fmt, sync::Arc};
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use matrix_sdk_common::{
     linked_chunk::{
         ChunkIdentifier, ChunkIdentifierGenerator, ChunkMetadata, LinkedChunkId, Position,
@@ -174,7 +175,7 @@ pub trait EventCacheStore: AsyncTraitDeps {
     async fn add_media_content(
         &self,
         request: &MediaRequestParameters,
-        content: Vec<u8>,
+        content: Bytes,
         ignore_policy: IgnoreMediaRetentionPolicy,
     ) -> Result<(), Self::Error>;
 
@@ -211,7 +212,7 @@ pub trait EventCacheStore: AsyncTraitDeps {
     async fn get_media_content(
         &self,
         request: &MediaRequestParameters,
-    ) -> Result<Option<Vec<u8>>, Self::Error>;
+    ) -> Result<Option<Bytes>, Self::Error>;
 
     /// Remove a media file's content from the media store.
     ///
@@ -237,8 +238,7 @@ pub trait EventCacheStore: AsyncTraitDeps {
     /// # Arguments
     ///
     /// * `uri` - The `MxcUri` of the media file.
-    async fn get_media_content_for_uri(&self, uri: &MxcUri)
-        -> Result<Option<Vec<u8>>, Self::Error>;
+    async fn get_media_content_for_uri(&self, uri: &MxcUri) -> Result<Option<Bytes>, Self::Error>;
 
     /// Remove all the media files' content associated to an `MxcUri` from the
     /// media store.
@@ -388,7 +388,7 @@ impl<T: EventCacheStore> EventCacheStore for EraseEventCacheStoreError<T> {
     async fn add_media_content(
         &self,
         request: &MediaRequestParameters,
-        content: Vec<u8>,
+        content: Bytes,
         ignore_policy: IgnoreMediaRetentionPolicy,
     ) -> Result<(), Self::Error> {
         self.0.add_media_content(request, content, ignore_policy).await.map_err(Into::into)
@@ -405,7 +405,7 @@ impl<T: EventCacheStore> EventCacheStore for EraseEventCacheStoreError<T> {
     async fn get_media_content(
         &self,
         request: &MediaRequestParameters,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    ) -> Result<Option<Bytes>, Self::Error> {
         self.0.get_media_content(request).await.map_err(Into::into)
     }
 
@@ -416,10 +416,7 @@ impl<T: EventCacheStore> EventCacheStore for EraseEventCacheStoreError<T> {
         self.0.remove_media_content(request).await.map_err(Into::into)
     }
 
-    async fn get_media_content_for_uri(
-        &self,
-        uri: &MxcUri,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    async fn get_media_content_for_uri(&self, uri: &MxcUri) -> Result<Option<Bytes>, Self::Error> {
         self.0.get_media_content_for_uri(uri).await.map_err(Into::into)
     }
 

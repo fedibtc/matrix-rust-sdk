@@ -2,6 +2,7 @@ use std::{ops::Not as _, sync::Arc, time::Duration};
 
 use as_variant::as_variant;
 use assert_matches2::{assert_let, assert_matches};
+use bytes::Bytes;
 #[cfg(feature = "unstable-msc4274")]
 use matrix_sdk::attachment::{GalleryConfig, GalleryItemInfo};
 use matrix_sdk::{
@@ -56,7 +57,7 @@ use wiremock::{Request, ResponseTemplate};
 async fn queue_attachment_no_thumbnail(q: &RoomSendQueue) -> (SendHandle, &'static str) {
     let filename = "surprise.jpeg.exe";
     let content_type = mime::IMAGE_JPEG;
-    let data = b"hello world".to_vec();
+    let data = Bytes::from_static(b"hello world");
     let config = AttachmentConfig::new().info(AttachmentInfo::Image(BaseImageInfo {
         height: Some(uint!(13)),
         width: Some(uint!(37)),
@@ -77,10 +78,10 @@ async fn queue_attachment_no_thumbnail(q: &RoomSendQueue) -> (SendHandle, &'stat
 async fn queue_attachment_with_thumbnail(q: &RoomSendQueue) -> (SendHandle, &'static str) {
     let filename = "surprise.jpeg.exe";
     let content_type = mime::IMAGE_JPEG;
-    let data = b"hello world".to_vec();
+    let data = Bytes::from_static(b"hello world");
 
     let thumbnail = Thumbnail {
-        data: b"thumbnail".to_vec(),
+        data: Bytes::from_static(b"thumbnail"),
         content_type: content_type.clone(),
         height: uint!(13),
         width: uint!(37),
@@ -1850,11 +1851,11 @@ async fn test_media_uploads() {
     // Create the media to send, with a thumbnail.
     let filename = "surprise.jpeg.exe";
     let content_type = mime::IMAGE_JPEG;
-    let data = b"hello world".to_vec();
+    let data = Bytes::from_static(b"hello world");
     let replied_to_event_id = event_id!("$foo:bar.com");
 
     let thumbnail = Thumbnail {
-        data: b"thumbnail".to_vec(),
+        data: Bytes::from_static(b"thumbnail"),
         content_type: content_type.clone(),
         height: uint!(13),
         width: uint!(37),
@@ -1966,7 +1967,7 @@ async fn test_media_uploads() {
         )
         .await
         .expect("media should be found");
-    assert_eq!(file_media, b"hello world");
+    assert_eq!(&*file_media, b"hello world");
 
     // ----------------------
     // Thumbnail.
@@ -1994,7 +1995,7 @@ async fn test_media_uploads() {
         )
         .await
         .expect("media should be found");
-    assert_eq!(thumbnail_media, b"thumbnail");
+    assert_eq!(&*thumbnail_media, b"thumbnail");
 
     // The format should be ignored when requesting a local media.
     let thumbnail_media = client
@@ -2011,7 +2012,7 @@ async fn test_media_uploads() {
         )
         .await
         .expect("media should be found");
-    assert_eq!(thumbnail_media, b"thumbnail");
+    assert_eq!(&*thumbnail_media, b"thumbnail");
 
     // ----------------------
     // Send handle operations.
@@ -2054,7 +2055,7 @@ async fn test_media_uploads() {
         )
         .await
         .expect("media should be found with its final MXC uri in the cache");
-    assert_eq!(file_media, b"hello world");
+    assert_eq!(&*file_media, b"hello world");
 
     let new_thumbnail_source = new_content.info.unwrap().thumbnail_source.unwrap();
     assert_let!(MediaSource::Plain(new_uri) = &new_thumbnail_source);
@@ -2068,7 +2069,7 @@ async fn test_media_uploads() {
         )
         .await
         .expect("media should be found");
-    assert_eq!(thumbnail_media, b"thumbnail");
+    assert_eq!(&*thumbnail_media, b"thumbnail");
 
     // The local URI does not work anymore.
     client
@@ -2110,16 +2111,16 @@ async fn test_gallery_uploads() {
     // Create the medias to send, with thumbnails.
     let filename1 = "surprise.jpeg.exe";
     let content_type1 = mime::IMAGE_JPEG;
-    let data1 = b"hello world".to_vec();
+    let data1 = Bytes::from_static(b"hello world");
 
     let filename2 = "onemore.jpeg.exe";
     let content_type2 = mime::IMAGE_JPEG;
-    let data2 = b"hello again".to_vec();
+    let data2 = Bytes::from_static(b"hello world");
 
     let replied_to_event_id = event_id!("$foo:bar.com");
 
     let thumbnail1 = Thumbnail {
-        data: b"thumbnail".to_vec(),
+        data: Bytes::from_static(b"thumbnail"),
         content_type: content_type1.clone(),
         height: uint!(13),
         width: uint!(37),
@@ -2127,7 +2128,7 @@ async fn test_gallery_uploads() {
     };
 
     let thumbnail2 = Thumbnail {
-        data: b"another thumbnail".to_vec(),
+        data: Bytes::from_static(b"another thumbnail"),
         content_type: content_type2.clone(),
         height: uint!(15),
         width: uint!(39),
@@ -2275,7 +2276,7 @@ async fn test_gallery_uploads() {
         )
         .await
         .expect("media should be found");
-    assert_eq!(file_media, b"hello world");
+    assert_eq!(&*file_media, b"hello world");
 
     // ----------------------
     // Thumbnail 1.
@@ -2303,7 +2304,7 @@ async fn test_gallery_uploads() {
         )
         .await
         .expect("media should be found");
-    assert_eq!(thumbnail_media, b"thumbnail");
+    assert_eq!(&*thumbnail_media, b"thumbnail");
 
     // The format should be ignored when requesting a local media.
     let thumbnail_media = client
@@ -2320,7 +2321,7 @@ async fn test_gallery_uploads() {
         )
         .await
         .expect("media should be found");
-    assert_eq!(thumbnail_media, b"thumbnail");
+    assert_eq!(&*thumbnail_media, b"thumbnail");
 
     // ----------------------
     // Media 2.
@@ -2350,7 +2351,7 @@ async fn test_gallery_uploads() {
         )
         .await
         .expect("media should be found");
-    assert_eq!(file_media, b"hello again");
+    assert_eq!(&*file_media, b"hello again");
 
     // ----------------------
     // Thumbnail 2.
@@ -2378,7 +2379,7 @@ async fn test_gallery_uploads() {
         )
         .await
         .expect("media should be found");
-    assert_eq!(thumbnail_media, b"another thumbnail");
+    assert_eq!(&*thumbnail_media, b"another thumbnail");
 
     // The format should be ignored when requesting a local media.
     let thumbnail_media = client
@@ -2395,7 +2396,7 @@ async fn test_gallery_uploads() {
         )
         .await
         .expect("media should be found");
-    assert_eq!(thumbnail_media, b"another thumbnail");
+    assert_eq!(&*thumbnail_media, b"another thumbnail");
 
     // ----------------------
     // Send handle operations.
@@ -2456,7 +2457,7 @@ async fn test_gallery_uploads() {
         )
         .await
         .expect("media should be found with its final MXC uri in the cache");
-    assert_eq!(file_media, b"hello world");
+    assert_eq!(&*file_media, b"hello world");
 
     let new_thumbnail_source = new_content.info.clone().unwrap().thumbnail_source.unwrap();
     assert_let!(MediaSource::Plain(new_uri) = &new_thumbnail_source);
@@ -2470,7 +2471,7 @@ async fn test_gallery_uploads() {
         )
         .await
         .expect("media should be found");
-    assert_eq!(thumbnail_media, b"thumbnail");
+    assert_eq!(&*thumbnail_media, b"thumbnail");
 
     // The local URI does not work anymore.
     client
@@ -2503,7 +2504,7 @@ async fn test_gallery_uploads() {
         )
         .await
         .expect("media should be found with its final MXC uri in the cache");
-    assert_eq!(file_media, b"hello again");
+    assert_eq!(&*file_media, b"hello again");
 
     let new_thumbnail_source = new_content.info.clone().unwrap().thumbnail_source.unwrap();
     assert_let!(MediaSource::Plain(new_uri) = &new_thumbnail_source);
@@ -2517,7 +2518,7 @@ async fn test_gallery_uploads() {
         )
         .await
         .expect("media should be found");
-    assert_eq!(thumbnail_media, b"another thumbnail");
+    assert_eq!(&*thumbnail_media, b"another thumbnail");
 
     // The local URI does not work anymore.
     client

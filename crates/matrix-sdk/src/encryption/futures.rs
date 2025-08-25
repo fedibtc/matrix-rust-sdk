@@ -91,7 +91,7 @@ where
 
             let response = client
                 .media()
-                .upload(&mime::APPLICATION_OCTET_STREAM, buf, request_config)
+                .upload(&mime::APPLICATION_OCTET_STREAM, buf.into(), request_config)
                 .with_send_progress_observable(send_progress)
                 .await?;
 

@@ -17,6 +17,7 @@
 #[cfg(feature = "unstable-msc4274")]
 use std::{collections::HashMap, iter::zip};
 
+use bytes::Bytes;
 use matrix_sdk_base::{
     event_cache::store::media::IgnoreMediaRetentionPolicy,
     media::{MediaFormat, MediaRequestParameters},
@@ -198,7 +199,7 @@ impl RoomSendQueue {
         &self,
         filename: impl Into<String>,
         content_type: Mime,
-        data: Vec<u8>,
+        data: Bytes,
         mut config: AttachmentConfig,
     ) -> Result<SendHandle, RoomSendQueueError> {
         let Some(room) = self.inner.room.get() else {
@@ -415,7 +416,7 @@ impl RoomSendQueue {
 
     async fn cache_media(
         room: &Room,
-        data: Vec<u8>,
+        data: Bytes,
         thumbnail: Option<Thumbnail>,
         file_media_request: &MediaRequestParameters,
     ) -> Result<MediaCacheResult, RoomSendQueueError> {

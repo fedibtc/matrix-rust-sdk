@@ -17,6 +17,7 @@
 use std::{fmt, iter::once, path::Path, sync::Arc};
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use deadpool_sqlite::{Object as SqliteAsyncConn, Pool as SqlitePool, Runtime};
 use matrix_sdk_base::{
     deserialized_responses::TimelineEvent,
@@ -636,7 +637,7 @@ impl EventCacheStore for SqliteEventCacheStore {
                         // | $ev2     | !r0             | 42       | 2        |
                         // | $ev3     | !r0             | 42       | 3        |
                         // | $ev4     | !r0             | 42       | 4        |
-                        // 
+                        //
                         // `$ev2` has been removed, then we end up in this
                         // state:
                         //
@@ -650,7 +651,7 @@ impl EventCacheStore for SqliteEventCacheStore {
                         //
                         // We need to shift the `position` of `$ev3` and `$ev4`
                         // to `position - 1`, like so:
-                        // 
+                        //
                         // | event_id | linked_chunk_id | chunk_id | position |
                         // |----------|-----------------|----------|----------|
                         // | $ev0     | !r0             | 42       | 0        |
@@ -710,7 +711,7 @@ impl EventCacheStore for SqliteEventCacheStore {
                         // see _dropping and re-creating the index_, which is
                         // no-go for us, it's too expensive. I (@hywan) have
                         // adopted the following one:
-                        // 
+                        //
                         // - Do `position = position - 1` but in the negative
                         //   space, so `position = -(position - 1)`. A position
                         //   cannot be negative; we are sure it is unique!
@@ -1193,7 +1194,7 @@ impl EventCacheStore for SqliteEventCacheStore {
     async fn add_media_content(
         &self,
         request: &MediaRequestParameters,
-        content: Vec<u8>,
+        content: Bytes,
         ignore_policy: IgnoreMediaRetentionPolicy,
     ) -> Result<()> {
         self.media_service.add_media_content(self, request, content, ignore_policy).await
@@ -1220,7 +1221,7 @@ impl EventCacheStore for SqliteEventCacheStore {
         Ok(())
     }
 
-    async fn get_media_content(&self, request: &MediaRequestParameters) -> Result<Option<Vec<u8>>> {
+    async fn get_media_content(&self, request: &MediaRequestParameters) -> Result<Option<Bytes>> {
         self.media_service.get_media_content(self, request).await
     }
 
@@ -1234,10 +1235,7 @@ impl EventCacheStore for SqliteEventCacheStore {
         Ok(())
     }
 
-    async fn get_media_content_for_uri(
-        &self,
-        uri: &MxcUri,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    async fn get_media_content_for_uri(&self, uri: &MxcUri) -> Result<Option<Bytes>, Self::Error> {
         self.media_service.get_media_content_for_uri(self, uri).await
     }
 
@@ -1298,13 +1296,13 @@ impl EventCacheStoreMedia for SqliteEventCacheStore {
     async fn add_media_content_inner(
         &self,
         request: &MediaRequestParameters,
-        data: Vec<u8>,
+        data: Bytes,
         last_access: SystemTime,
         policy: MediaRetentionPolicy,
         ignore_policy: IgnoreMediaRetentionPolicy,
     ) -> Result<(), Self::Error> {
         let ignore_policy = ignore_policy.is_yes();
-        let data = self.encode_value(data)?;
+        let data = self.encode_value(data.into())?;
 
         if !ignore_policy && policy.exceeds_max_file_size(data.len() as u64) {
             return Ok(());
@@ -1347,7 +1345,7 @@ impl EventCacheStoreMedia for SqliteEventCacheStore {
         &self,
         request: &MediaRequestParameters,
         current_time: SystemTime,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    ) -> Result<Option<Bytes>, Self::Error> {
         let uri = self.encode_key(keys::MEDIA, request.source.unique_key());
         let format = self.encode_key(keys::MEDIA, request.format.unique_key());
         let timestamp = time_to_timestamp(current_time);
@@ -1372,14 +1370,14 @@ impl EventCacheStoreMedia for SqliteEventCacheStore {
             })
             .await?;
 
-        data.map(|v| self.decode_value(&v).map(Into::into)).transpose()
+        data.map(|v| self.decode_value(&v).map(|x| x.into_owned().into())).transpose()
     }
 
     async fn get_media_content_for_uri_inner(
         &self,
         uri: &MxcUri,
         current_time: SystemTime,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    ) -> Result<Option<Bytes>, Self::Error> {
         let uri = self.encode_key(keys::MEDIA, uri);
         let timestamp = time_to_timestamp(current_time);
 
@@ -1400,7 +1398,7 @@ impl EventCacheStoreMedia for SqliteEventCacheStore {
             })
             .await?;
 
-        data.map(|v| self.decode_value(&v).map(Into::into)).transpose()
+        data.map(|v| self.decode_value(&v).map(|x| x.into_owned().into())).transpose()
     }
 
     async fn clean_up_media_cache_inner(
@@ -1706,6 +1704,7 @@ mod tests {
     };
 
     use assert_matches::assert_matches;
+    use bytes::Bytes;
     use matrix_sdk_base::{
         event_cache::{
             store::{
@@ -1793,8 +1792,8 @@ mod tests {
             )),
         };
 
-        let content: Vec<u8> = "hello world".into();
-        let thumbnail_content: Vec<u8> = "hello…".into();
+        let content: Bytes = "hello world".into();
+        let thumbnail_content: Bytes = "hello…".into();
 
         // Add the media.
         event_cache_store

@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use bytes::Bytes;
 use matrix_sdk::{
     attachment::{AttachmentConfig, AttachmentInfo, BaseImageInfo, BaseVideoInfo, Thumbnail},
     media::{MediaFormat, MediaRequestParameters, MediaThumbnailSettings},
@@ -51,7 +52,7 @@ async fn test_room_attachment_send() {
         .send_attachment(
             "image",
             &mime::IMAGE_JPEG,
-            b"Hello world".to_vec(),
+            Bytes::from_static(b"Hello world"),
             AttachmentConfig::new(),
         )
         .await
@@ -89,7 +90,7 @@ async fn test_room_attachment_send_in_encrypted_room_has_binary_mime_type() {
         .send_attachment(
             "image",
             &mime::IMAGE_JPEG,
-            b"Hello world".to_vec(),
+            Bytes::from_static(b"Hello world"),
             AttachmentConfig::new(),
         )
         .await
@@ -138,7 +139,7 @@ async fn test_room_attachment_send_info() {
         .caption(Some("image caption".to_owned()));
 
     let response = room
-        .send_attachment("image.jpg", &mime::IMAGE_JPEG, b"Hello world".to_vec(), config)
+        .send_attachment("image.jpg", &mime::IMAGE_JPEG, Bytes::from_static(b"Hello world"), config)
         .await
         .unwrap();
 
@@ -191,8 +192,9 @@ async fn test_room_attachment_send_wrong_info() {
         .caption(Some("image caption".to_owned()));
 
     // But here, using `image/jpeg`.
-    let response =
-        room.send_attachment("image.jpg", &mime::IMAGE_JPEG, b"Hello world".to_vec(), config).await;
+    let response = room
+        .send_attachment("image.jpg", &mime::IMAGE_JPEG, Bytes::from_static(b"Hello world"), config)
+        .await;
 
     // In the real-world, this would lead to the size information getting lost,
     // instead of an error during upload. …Is this test any useful?
@@ -254,7 +256,7 @@ async fn test_room_attachment_send_info_thumbnail() {
     // Send the attachment with a thumbnail.
     let config = AttachmentConfig::new()
         .thumbnail(Some(Thumbnail {
-            data: b"Thumbnail".to_vec(),
+            data: Bytes::from_static(b"Thumbnail"),
             content_type: mime::IMAGE_JPEG,
             height: uint!(360),
             width: uint!(480),
@@ -267,7 +269,7 @@ async fn test_room_attachment_send_info_thumbnail() {
         }));
 
     let response = room
-        .send_attachment("image", &mime::IMAGE_JPEG, b"Hello world".to_vec(), config)
+        .send_attachment("image", &mime::IMAGE_JPEG, Bytes::from_static(b"Hello world"), config)
         .store_in_cache()
         .await
         .unwrap();
@@ -278,11 +280,11 @@ async fn test_room_attachment_send_info_thumbnail() {
     // The media is immediately cached in the cache store, so we don't need to set
     // up another mock endpoint for getting the media.
     let reloaded = client.media().get_media_content(&media_request, true).await.unwrap();
-    assert_eq!(reloaded, b"Hello world");
+    assert_eq!(&*reloaded, b"Hello world");
 
     // The thumbnail is cached with sensible defaults.
     let reloaded = client.media().get_media_content(&thumbnail_request, true).await.unwrap();
-    assert_eq!(reloaded, b"Thumbnail");
+    assert_eq!(&*reloaded, b"Thumbnail");
 
     // The thumbnail can't be retrieved as a file.
     let _ = client
@@ -339,7 +341,7 @@ async fn test_room_attachment_send_mentions() {
         .send_attachment(
             "image",
             &mime::IMAGE_JPEG,
-            b"Hello world".to_vec(),
+            Bytes::from_static(b"Hello world"),
             AttachmentConfig::new()
                 .mentions(Some(Mentions::with_user_ids([owned_user_id!("@user:localhost")]))),
         )
@@ -398,7 +400,7 @@ async fn test_room_attachment_reply_outside_thread() {
         .send_attachment(
             "image",
             &mime::IMAGE_JPEG,
-            b"Hello world".to_vec(),
+            Bytes::from_static(b"Hello world"),
             AttachmentConfig::new()
                 .mentions(Some(Mentions::with_user_ids([owned_user_id!("@user:localhost")])))
                 .reply(Some(Reply {
@@ -464,7 +466,7 @@ async fn test_room_attachment_start_thread() {
         .send_attachment(
             "image",
             &mime::IMAGE_JPEG,
-            b"Hello world".to_vec(),
+            Bytes::from_static(b"Hello world"),
             AttachmentConfig::new()
                 .mentions(Some(Mentions::with_user_ids([owned_user_id!("@user:localhost")])))
                 .reply(Some(Reply {
@@ -531,7 +533,7 @@ async fn test_room_attachment_reply_on_thread_as_reply() {
         .send_attachment(
             "image",
             &mime::IMAGE_JPEG,
-            b"Hello world".to_vec(),
+            Bytes::from_static(b"Hello world"),
             AttachmentConfig::new()
                 .mentions(Some(Mentions::with_user_ids([owned_user_id!("@user:localhost")])))
                 .reply(Some(Reply {
@@ -599,7 +601,7 @@ async fn test_room_attachment_reply_forwarding_thread() {
         .send_attachment(
             "image",
             &mime::IMAGE_JPEG,
-            b"Hello world".to_vec(),
+            Bytes::from_static(b"Hello world"),
             AttachmentConfig::new()
                 .mentions(Some(Mentions::with_user_ids([owned_user_id!("@user:localhost")])))
                 .reply(Some(Reply {
@@ -655,7 +657,7 @@ async fn test_room_attachment_send_is_animated() {
         .caption(Some("image caption".to_owned()));
 
     let response = room
-        .send_attachment("image.jpg", &mime::IMAGE_JPEG, b"Hello world".to_vec(), config)
+        .send_attachment("image.jpg", &mime::IMAGE_JPEG, Bytes::from_static(b"Hello world"), config)
         .await
         .unwrap();
 

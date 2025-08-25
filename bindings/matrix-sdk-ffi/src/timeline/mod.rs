@@ -180,7 +180,7 @@ fn build_thumbnail_info(
                 mime_str.parse::<Mime>().map_err(|_| RoomError::InvalidAttachmentMimeType)?;
 
             Ok(Some(Thumbnail {
-                data: thumbnail_data,
+                data: thumbnail_data.into(),
                 content_type: mime_type,
                 height,
                 width,
@@ -234,7 +234,7 @@ impl From<UploadSource> for AttachmentSource {
     fn from(value: UploadSource) -> Self {
         match value {
             UploadSource::File { filename } => Self::File(filename.into()),
-            UploadSource::Data { bytes, filename } => Self::Data { bytes, filename },
+            UploadSource::Data { bytes, filename } => Self::Data { bytes: bytes.into(), filename },
         }
     }
 }

@@ -18,6 +18,7 @@
 
 use std::future::IntoFuture;
 
+use bytes::Bytes;
 use eyeball::SharedObservable;
 use matrix_sdk_common::boxed_into_future;
 use mime::Mime;
@@ -242,7 +243,7 @@ pub struct SendAttachment<'a> {
     room: &'a Room,
     filename: String,
     content_type: &'a Mime,
-    data: Vec<u8>,
+    data: Bytes,
     config: AttachmentConfig,
     tracing_span: Span,
     send_progress: SharedObservable<TransmissionProgress>,
@@ -254,7 +255,7 @@ impl<'a> SendAttachment<'a> {
         room: &'a Room,
         filename: String,
         content_type: &'a Mime,
-        data: Vec<u8>,
+        data: Bytes,
         config: AttachmentConfig,
     ) -> Self {
         Self {

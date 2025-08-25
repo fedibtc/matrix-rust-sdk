@@ -16,6 +16,7 @@
 
 use std::time::Duration;
 
+use bytes::Bytes;
 use ruma::{
     assign,
     events::{
@@ -157,7 +158,7 @@ impl From<AttachmentInfo> for FileInfo {
 #[derive(Debug)]
 pub struct Thumbnail {
     /// The raw bytes of the thumbnail.
-    pub data: Vec<u8>,
+    pub data: Bytes,
     /// The type of the thumbnail, this will be used as the content-type header.
     pub content_type: mime::Mime,
     /// The height of the thumbnail in pixels.
@@ -170,7 +171,7 @@ pub struct Thumbnail {
 
 impl Thumbnail {
     /// Convert this `Thumbnail` into a `(data, content_type, info)` tuple.
-    pub fn into_parts(self) -> (Vec<u8>, mime::Mime, Box<ThumbnailInfo>) {
+    pub fn into_parts(self) -> (Bytes, mime::Mime, Box<ThumbnailInfo>) {
         let thumbnail_info = assign!(ThumbnailInfo::new(), {
             height: Some(self.height),
             width: Some(self.width),
@@ -380,7 +381,7 @@ pub struct GalleryItemInfo {
     /// The mime type.
     pub content_type: mime::Mime,
     /// The binary data.
-    pub data: Vec<u8>,
+    pub data: Bytes,
     /// The attachment info.
     pub attachment_info: AttachmentInfo,
     /// The caption.

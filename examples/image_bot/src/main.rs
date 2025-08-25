@@ -19,7 +19,7 @@ async fn on_room_message(event: OriginalSyncRoomMessageEvent, room: Room, image:
         room.send_attachment(
             "cat.jpg",
             &mime::IMAGE_JPEG,
-            image,
+            image.into(),
             AttachmentConfig::new().caption(Some("my pretty cat".to_owned())),
         )
         .await

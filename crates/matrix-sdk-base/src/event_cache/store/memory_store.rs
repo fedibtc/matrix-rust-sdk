@@ -19,6 +19,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use matrix_sdk_common::{
     linked_chunk::{
         relational::RelationalLinkedChunk, ChunkIdentifier, ChunkIdentifierGenerator,
@@ -72,7 +73,7 @@ struct MediaContent {
     key: String,
 
     /// The bytes of the content.
-    data: Vec<u8>,
+    data: Bytes,
 
     /// Whether we should ignore the [`MediaRetentionPolicy`] for this content.
     ignore_policy: bool,
@@ -281,7 +282,7 @@ impl EventCacheStore for MemoryStore {
     async fn add_media_content(
         &self,
         request: &MediaRequestParameters,
-        data: Vec<u8>,
+        data: Bytes,
         ignore_policy: IgnoreMediaRetentionPolicy,
     ) -> Result<()> {
         self.media_service.add_media_content(self, request, data, ignore_policy).await
@@ -306,7 +307,7 @@ impl EventCacheStore for MemoryStore {
         Ok(())
     }
 
-    async fn get_media_content(&self, request: &MediaRequestParameters) -> Result<Option<Vec<u8>>> {
+    async fn get_media_content(&self, request: &MediaRequestParameters) -> Result<Option<Bytes>> {
         self.media_service.get_media_content(self, request).await
     }
 
@@ -326,10 +327,7 @@ impl EventCacheStore for MemoryStore {
         Ok(())
     }
 
-    async fn get_media_content_for_uri(
-        &self,
-        uri: &MxcUri,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    async fn get_media_content_for_uri(&self, uri: &MxcUri) -> Result<Option<Bytes>, Self::Error> {
         self.media_service.get_media_content_for_uri(self, uri).await
     }
 
@@ -397,7 +395,7 @@ impl EventCacheStoreMedia for MemoryStore {
     async fn add_media_content_inner(
         &self,
         request: &MediaRequestParameters,
-        data: Vec<u8>,
+        data: Bytes,
         last_access: SystemTime,
         policy: MediaRetentionPolicy,
         ignore_policy: IgnoreMediaRetentionPolicy,
@@ -445,7 +443,7 @@ impl EventCacheStoreMedia for MemoryStore {
         &self,
         request: &MediaRequestParameters,
         current_time: SystemTime,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    ) -> Result<Option<Bytes>, Self::Error> {
         let mut inner = self.inner.write().unwrap();
         let expected_key = request.unique_key();
 
@@ -474,7 +472,7 @@ impl EventCacheStoreMedia for MemoryStore {
         &self,
         expected_uri: &MxcUri,
         current_time: SystemTime,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    ) -> Result<Option<Bytes>, Self::Error> {
         let mut inner = self.inner.write().unwrap();
 
         // First get the content out of the buffer, we are going to put it back at the

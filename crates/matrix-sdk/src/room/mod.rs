@@ -24,6 +24,7 @@ use std::{
 };
 
 use async_stream::stream;
+use bytes::Bytes;
 use eyeball::SharedObservable;
 use futures_core::Stream;
 use futures_util::{future::join_all, stream::FuturesUnordered};
@@ -429,7 +430,7 @@ impl Room {
     /// }
     /// # };
     /// ```
-    pub async fn avatar(&self, format: MediaFormat) -> Result<Option<Vec<u8>>> {
+    pub async fn avatar(&self, format: MediaFormat) -> Result<Option<Bytes>> {
         let Some(url) = self.avatar_url() else { return Ok(None) };
         let request = MediaRequestParameters { source: MediaSource::Plain(url.to_owned()), format };
         Ok(Some(self.client.media().get_media_content(&request, true).await?))
@@ -2175,7 +2176,7 @@ impl Room {
         &'a self,
         filename: impl Into<String>,
         content_type: &'a Mime,
-        data: Vec<u8>,
+        data: Bytes,
         config: AttachmentConfig,
     ) -> SendAttachment<'a> {
         SendAttachment::new(self, filename.into(), content_type, data, config)
@@ -2213,7 +2214,7 @@ impl Room {
         &'a self,
         filename: String,
         content_type: &'a Mime,
-        data: Vec<u8>,
+        data: Bytes,
         mut config: AttachmentConfig,
         send_progress: SharedObservable<TransmissionProgress>,
         store_in_cache: bool,
@@ -2509,7 +2510,7 @@ impl Room {
     pub async fn upload_avatar(
         &self,
         mime: &Mime,
-        data: Vec<u8>,
+        data: Bytes,
         info: Option<avatar::ImageInfo>,
     ) -> Result<send_state_event::v3::Response> {
         self.ensure_room_joined()?;
