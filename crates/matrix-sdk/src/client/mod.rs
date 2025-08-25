@@ -4316,6 +4316,7 @@ pub(crate) mod tests {
     };
 
     use assert_matches::assert_matches;
+    use bytes::Bytes;
     use eyeball::SharedObservable;
     use futures_util::{FutureExt, StreamExt};
     use js_int::{UInt, uint};
@@ -5823,7 +5824,7 @@ pub(crate) mod tests {
         client.load_or_fetch_max_upload_size().await.unwrap();
         assert_eq!(*client.inner.server_max_upload_size.lock().await.get().unwrap(), uint!(1));
 
-        let data = vec![1, 2];
+        let data = Bytes::from(vec![1, 2]);
         let upload_request =
             ruma::api::client::media::create_content::v3::Request::new(data.clone());
         let request = SendRequest {
