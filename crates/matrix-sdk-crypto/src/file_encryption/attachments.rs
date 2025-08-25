@@ -18,7 +18,7 @@ use aes::{
     Aes256,
     cipher::{KeyIvInit, StreamCipher},
 };
-use rand::{Rng, rng};
+use rand::{Rng, RngExt, rng};
 use ruma::{
     events::room::{
         EncryptedFile, EncryptedFileHash, EncryptedFileHashAlgorithm, EncryptedFileHashes,
@@ -145,6 +145,32 @@ impl<'a, R: Read + 'a> AttachmentDecryptor<'a, R> {
 
         Ok(AttachmentDecryptor { inner: input, expected_hash: hash, sha, aes })
     }
+}
+
+/// Encrypt the attachment data in place.
+pub fn encrypt_attachment_in_place(bytes: &mut [u8]) -> MediaEncryptionInfo {
+    let mut key = [0u8; KEY_SIZE];
+    let mut iv = [0u8; IV_SIZE];
+
+    let mut rng = rng();
+
+    rng.fill(&mut key);
+    // Only populate the first 8 bytes with randomness, the rest is 0
+    // initialized for the counter.
+    rng.fill(&mut iv[0..8]);
+
+    let key_array = &key.into();
+
+    let mut aes = Aes256Ctr::new(key_array, &iv.into());
+    let mut sha = Sha256::default();
+    aes.apply_keystream(bytes);
+    sha.update(bytes);
+
+    let hash = sha.finalize();
+    let mut hashes = EncryptedFileHashes::new();
+    hashes.insert(EncryptedFileHash::Sha256(Base64::new(hash.into())));
+
+    MediaEncryptionInfo { encryption_info: V2EncryptedFileInfo::encode(key, iv).into(), hashes }
 }
 
 /// A wrapper that transparently encrypts anything that implements `Read`.
