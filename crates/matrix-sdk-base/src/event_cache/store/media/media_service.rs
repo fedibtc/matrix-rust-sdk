@@ -160,7 +160,7 @@ where
         &self,
         store: &Store,
         request: &MediaRequestParameters,
-        content: Vec<u8>,
+        content: &[u8],
         ignore_policy: IgnoreMediaRetentionPolicy,
     ) -> Result<(), Store::Error> {
         let policy = self.media_retention_policy();
@@ -397,7 +397,7 @@ pub trait EventCacheStoreMedia: AsyncTraitDeps + Clone {
     async fn add_media_content_inner(
         &self,
         request: &MediaRequestParameters,
-        content: Vec<u8>,
+        content: &[u8],
         current_time: SystemTime,
         policy: MediaRetentionPolicy,
         ignore_policy: IgnoreMediaRetentionPolicy,
@@ -652,7 +652,7 @@ mod tests {
         async fn add_media_content_inner(
             &self,
             request: &MediaRequestParameters,
-            content: Vec<u8>,
+            content: &[u8],
             current_time: SystemTime,
             policy: MediaRetentionPolicy,
             ignore_policy: IgnoreMediaRetentionPolicy,
@@ -668,14 +668,14 @@ mod tests {
 
             if let Some(pos) = inner.media_list.iter().position(|content| content.key == key) {
                 let media_content = &mut inner.media_list[pos];
-                media_content.content = content;
+                media_content.content = content.to_vec();
                 media_content.last_access = current_time;
                 media_content.ignore_policy = ignore_policy;
             } else {
                 inner.media_list.push(MediaContent {
                     key,
                     uri: request.uri().to_owned(),
-                    content,
+                    content: content.to_vec(),
                     ignore_policy,
                     last_access: current_time,
                 });
@@ -798,7 +798,7 @@ mod tests {
 
         // Add media.
         service
-            .add_media_content(&store, &request, content.to_vec(), IgnoreMediaRetentionPolicy::No)
+            .add_media_content(&store, &request, content, IgnoreMediaRetentionPolicy::No)
             .await
             .unwrap();
         assert!(store.accessed());
@@ -899,7 +899,7 @@ mod tests {
             .add_media_content(
                 &store,
                 &small_request,
-                small_content.to_vec(),
+                small_content,
                 IgnoreMediaRetentionPolicy::No,
             )
             .await
@@ -944,12 +944,7 @@ mod tests {
 
         // Add big media, it will not work because it is bigger than the max file size.
         service
-            .add_media_content(
-                &store,
-                &big_request,
-                big_content.to_vec(),
-                IgnoreMediaRetentionPolicy::No,
-            )
+            .add_media_content(&store, &big_request, big_content, IgnoreMediaRetentionPolicy::No)
             .await
             .unwrap();
         assert!(!store.accessed());
@@ -969,12 +964,7 @@ mod tests {
 
         // Add big media, but this time ignore the policy.
         service
-            .add_media_content(
-                &store,
-                &big_request,
-                big_content.to_vec(),
-                IgnoreMediaRetentionPolicy::Yes,
-            )
+            .add_media_content(&store, &big_request, big_content, IgnoreMediaRetentionPolicy::Yes)
             .await
             .unwrap();
         assert!(store.accessed());
@@ -1043,11 +1033,11 @@ mod tests {
 
         // Add the contents.
         service
-            .add_media_content(&store, &request_1, content.clone(), IgnoreMediaRetentionPolicy::No)
+            .add_media_content(&store, &request_1, &content, IgnoreMediaRetentionPolicy::No)
             .await
             .unwrap();
         service
-            .add_media_content(&store, &request_2, content, IgnoreMediaRetentionPolicy::No)
+            .add_media_content(&store, &request_2, &content, IgnoreMediaRetentionPolicy::No)
             .await
             .unwrap();
         assert!(service.inner.automatic_media_cleanup_join_handle.lock().is_none());

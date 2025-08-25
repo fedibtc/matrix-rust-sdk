@@ -21,7 +21,10 @@ use matrix_sdk_base::{
 use ruma::{events::room::MediaSource, OwnedUserId, UserId};
 use tracing::{info, instrument, warn};
 
-use crate::{crypto::types::events::room_key_bundle::RoomKeyBundleContent, Error, Result, Room};
+use crate::{
+    crypto::types::events::room_key_bundle::RoomKeyBundleContent, encryption::EncryptedBytes,
+    Error, Result, Room,
+};
 
 /// Share any shareable E2EE history in the given room with the given recipient,
 /// as per [MSC4268].
@@ -57,7 +60,7 @@ pub(super) async fn share_room_history(room: &Room, user_id: OwnedUserId) -> Res
 
     // 2. Upload to the server as an encrypted file
     let json = serde_json::to_vec(&bundle)?;
-    let upload = client.upload_encrypted_file(&mut (json.as_slice())).await?;
+    let upload = client.upload_encrypted_file(EncryptedBytes::new(json.into())).await?;
 
     info!(
         media_url = ?upload.url,

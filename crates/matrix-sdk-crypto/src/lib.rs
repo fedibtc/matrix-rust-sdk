@@ -82,8 +82,8 @@ pub use error::{
     SetRoomSettingsError, SignatureError,
 };
 pub use file_encryption::{
-    decrypt_room_key_export, encrypt_room_key_export, AttachmentDecryptor, AttachmentEncryptor,
-    DecryptorError, KeyExportError, MediaEncryptionInfo,
+    decrypt_room_key_export, encrypt_attachment_in_place, encrypt_room_key_export,
+    AttachmentDecryptor, AttachmentEncryptor, DecryptorError, KeyExportError, MediaEncryptionInfo,
 };
 pub use gossiping::{GossipRequest, GossippedSecret};
 pub use identities::{

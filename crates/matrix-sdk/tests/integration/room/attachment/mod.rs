@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use bytes::Bytes;
 use matrix_sdk::{
     attachment::{AttachmentConfig, AttachmentInfo, BaseImageInfo, BaseVideoInfo, Thumbnail},
     media::{MediaFormat, MediaRequestParameters, MediaThumbnailSettings},
@@ -278,11 +279,11 @@ async fn test_room_attachment_send_info_thumbnail() {
     // The media is immediately cached in the cache store, so we don't need to set
     // up another mock endpoint for getting the media.
     let reloaded = client.media().get_media_content(&media_request, true).await.unwrap();
-    assert_eq!(reloaded, b"Hello world");
+    assert_eq!(&*reloaded, b"Hello world");
 
     // The thumbnail is cached with sensible defaults.
     let reloaded = client.media().get_media_content(&thumbnail_request, true).await.unwrap();
-    assert_eq!(reloaded, b"Thumbnail");
+    assert_eq!(&*reloaded, b"Thumbnail");
 
     // The thumbnail can't be retrieved as a file.
     let _ = client

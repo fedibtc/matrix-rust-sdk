@@ -145,8 +145,7 @@ pub enum MediaError {
 
     /// The provided media is too large to upload.
     #[error(
-        "The provided media is too large to upload. \
-         Maximum upload length is {max} bytes, tried to upload {current} bytes"
+        "The provided media is too large to upload. \n        Maximum upload length is {max} bytes, tried to upload {current} bytes"
     )]
     MediaTooLargeToUpload {
         /// The `max_upload_size` value for this homeserver.
@@ -206,7 +205,7 @@ impl Media {
             self.client.request_config().timeout(Self::reasonable_upload_timeout(&data))
         });
 
-        let request = assign!(media::create_content::v3::Request::new(data), {
+        let request = assign!(media::create_content::v3::Request::new(data.into()), {
             content_type: Some(content_type.essence_str().to_owned()),
         });
 
@@ -525,7 +524,7 @@ impl Media {
                 .event_cache_store()
                 .lock()
                 .await?
-                .add_media_content(request, content.clone(), IgnoreMediaRetentionPolicy::No)
+                .add_media_content(request, &content, IgnoreMediaRetentionPolicy::No)
                 .await?;
         }
 
@@ -749,7 +748,7 @@ impl Media {
         let (data, content_type, thumbnail_info) = thumbnail.into_parts();
 
         let response = self
-            .upload(&content_type, data, None)
+            .upload(&content_type, data.into(), None)
             .with_send_progress_observable(send_progress)
             .await?;
         let url = response.content_uri;

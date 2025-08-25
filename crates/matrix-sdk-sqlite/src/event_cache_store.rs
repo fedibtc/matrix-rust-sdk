@@ -636,7 +636,7 @@ impl EventCacheStore for SqliteEventCacheStore {
                         // | $ev2     | !r0             | 42       | 2        |
                         // | $ev3     | !r0             | 42       | 3        |
                         // | $ev4     | !r0             | 42       | 4        |
-                        // 
+                        //
                         // `$ev2` has been removed, then we end up in this
                         // state:
                         //
@@ -650,7 +650,7 @@ impl EventCacheStore for SqliteEventCacheStore {
                         //
                         // We need to shift the `position` of `$ev3` and `$ev4`
                         // to `position - 1`, like so:
-                        // 
+                        //
                         // | event_id | linked_chunk_id | chunk_id | position |
                         // |----------|-----------------|----------|----------|
                         // | $ev0     | !r0             | 42       | 0        |
@@ -710,7 +710,7 @@ impl EventCacheStore for SqliteEventCacheStore {
                         // see _dropping and re-creating the index_, which is
                         // no-go for us, it's too expensive. I (@hywan) have
                         // adopted the following one:
-                        // 
+                        //
                         // - Do `position = position - 1` but in the negative
                         //   space, so `position = -(position - 1)`. A position
                         //   cannot be negative; we are sure it is unique!
@@ -1193,7 +1193,7 @@ impl EventCacheStore for SqliteEventCacheStore {
     async fn add_media_content(
         &self,
         request: &MediaRequestParameters,
-        content: Vec<u8>,
+        content: &[u8],
         ignore_policy: IgnoreMediaRetentionPolicy,
     ) -> Result<()> {
         self.media_service.add_media_content(self, request, content, ignore_policy).await
@@ -1298,13 +1298,13 @@ impl EventCacheStoreMedia for SqliteEventCacheStore {
     async fn add_media_content_inner(
         &self,
         request: &MediaRequestParameters,
-        data: Vec<u8>,
+        data: &[u8],
         last_access: SystemTime,
         policy: MediaRetentionPolicy,
         ignore_policy: IgnoreMediaRetentionPolicy,
     ) -> Result<(), Self::Error> {
         let ignore_policy = ignore_policy.is_yes();
-        let data = self.encode_value(data)?;
+        let data = self.encode_value_borrowed(data)?;
 
         if !ignore_policy && policy.exceeds_max_file_size(data.len() as u64) {
             return Ok(());
@@ -1798,7 +1798,7 @@ mod tests {
 
         // Add the media.
         event_cache_store
-            .add_media_content(&file_request, content.clone(), IgnoreMediaRetentionPolicy::No)
+            .add_media_content(&file_request, &content, IgnoreMediaRetentionPolicy::No)
             .await
             .expect("adding file failed");
 
@@ -1809,7 +1809,7 @@ mod tests {
         event_cache_store
             .add_media_content(
                 &thumbnail_request,
-                thumbnail_content.clone(),
+                &thumbnail_content,
                 IgnoreMediaRetentionPolicy::No,
             )
             .await

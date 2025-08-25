@@ -219,7 +219,7 @@ impl RoomSendQueue {
         let file_media_request = Media::make_local_file_media_request(&upload_file_txn);
 
         let MediaCacheResult { upload_thumbnail_txn, event_thumbnail_info, queue_thumbnail_info } =
-            RoomSendQueue::cache_media(&room, data, config.thumbnail.take(), &file_media_request)
+            RoomSendQueue::cache_media(&room, &data, config.thumbnail.take(), &file_media_request)
                 .await?;
 
         // Create the content for the media event.
@@ -339,7 +339,7 @@ impl RoomSendQueue {
                 upload_thumbnail_txn,
                 event_thumbnail_info,
                 queue_thumbnail_info,
-            } = RoomSendQueue::cache_media(&room, data, item_info.thumbnail, &file_media_request)
+            } = RoomSendQueue::cache_media(&room, &data, item_info.thumbnail, &file_media_request)
                 .await?;
 
             item_types.push(Room::make_gallery_item_type(
@@ -415,7 +415,7 @@ impl RoomSendQueue {
 
     async fn cache_media(
         room: &Room,
-        data: Vec<u8>,
+        data: &[u8],
         thumbnail: Option<Thumbnail>,
         file_media_request: &MediaRequestParameters,
     ) -> Result<MediaCacheResult, RoomSendQueueError> {
@@ -451,7 +451,7 @@ impl RoomSendQueue {
             cache_store
                 .add_media_content(
                     &thumbnail_media_request,
-                    data,
+                    &data,
                     // Make sure that the thumbnail is stored until it has been uploaded.
                     IgnoreMediaRetentionPolicy::Yes,
                 )

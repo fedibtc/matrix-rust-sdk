@@ -175,6 +175,7 @@ use crate::crypto::{OlmError, SessionRecipientCollectionError};
 use crate::{
     client::WeakClient,
     config::RequestConfig,
+    encryption::EncryptedBytes,
     error::RetryKind,
     room::{edit::EditedContent, WeakRoom},
     Client, Media, Room,
@@ -777,10 +778,10 @@ impl RoomSendQueue {
                     #[cfg(feature = "e2e-encryption")]
                     let media_source = if room.latest_encryption_state().await?.is_encrypted() {
                         trace!("upload will be encrypted (encrypted room)");
-                        let mut cursor = std::io::Cursor::new(data);
+                        let encrypted_bytes = EncryptedBytes::new(data.into());
                         let encrypted_file = room
                             .client()
-                            .upload_encrypted_file(&mut cursor)
+                            .upload_encrypted_file(encrypted_bytes)
                             .with_request_config(RequestConfig::short_retry())
                             .await?;
                         MediaSource::Encrypted(Box::new(encrypted_file))
@@ -788,8 +789,11 @@ impl RoomSendQueue {
                         trace!("upload will be in clear text (room without encryption)");
                         let request_config = RequestConfig::short_retry()
                             .timeout(Media::reasonable_upload_timeout(&data));
-                        let res =
-                            room.client().media().upload(&mime, data, Some(request_config)).await?;
+                        let res = room
+                            .client()
+                            .media()
+                            .upload(&mime, data.into(), Some(request_config))
+                            .await?;
                         MediaSource::Plain(res.content_uri)
                     };
 
@@ -797,8 +801,11 @@ impl RoomSendQueue {
                     let media_source = {
                         let request_config = RequestConfig::short_retry()
                             .timeout(Media::reasonable_upload_timeout(&data));
-                        let res =
-                            room.client().media().upload(&mime, data, Some(request_config)).await?;
+                        let res = room
+                            .client()
+                            .media()
+                            .upload(&mime, data.into(), Some(request_config))
+                            .await?;
                         MediaSource::Plain(res.content_uri)
                     };
 

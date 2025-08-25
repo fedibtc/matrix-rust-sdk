@@ -20,7 +20,7 @@
 use std::ops::Deref;
 use std::{
     collections::{BTreeMap, HashSet},
-    io::{Cursor, Read, Write},
+    io::Write,
     iter,
     path::PathBuf,
     sync::Arc,
@@ -55,7 +55,7 @@ use ruma::{
     assign,
     events::{
         direct::DirectUserIdentifier,
-        room::{MediaSource, ThumbnailInfo},
+        room::{EncryptedFile, MediaSource, ThumbnailInfo},
     },
     DeviceId, MilliSecondsSinceUnixEpoch, OwnedDeviceId, OwnedUserId, TransactionId, UserId,
 };
@@ -372,6 +372,19 @@ struct OAuthCrossSigningResetUiaaResetParameter {
     url: Url,
 }
 
+#[derive(Debug, Clone)]
+pub struct EncryptedBytes {
+    pub bytes: Vec<u8>,
+    info: MediaEncryptionInfo,
+}
+
+impl EncryptedBytes {
+    pub fn new(mut bytes: Vec<u8>) -> Self {
+        let info = matrix_sdk_base::crypto::encrypt_attachment_in_place(&mut bytes);
+        Self { bytes, info }
+    }
+}
+
 impl Client {
     pub(crate) async fn olm_machine(&self) -> RwLockReadGuard<'_, Option<OlmMachine>> {
         self.base_client().olm_machine().await
@@ -446,28 +459,22 @@ impl Client {
     /// room.send(CustomEventContent { encrypted_file }).await?;
     /// # anyhow::Ok(()) };
     /// ```
-    pub fn upload_encrypted_file<'a, R: Read + ?Sized + 'a>(
-        &'a self,
-        reader: &'a mut R,
-    ) -> UploadEncryptedFile<'a, R> {
-        UploadEncryptedFile::new(self, reader)
+    pub fn upload_encrypted_file<'a>(&'a self, bytes: EncryptedBytes) -> UploadEncryptedFile<'a> {
+        UploadEncryptedFile::new(self, bytes)
     }
 
     /// Encrypt and upload the file and thumbnails, and return the source
     /// information.
     pub(crate) async fn upload_encrypted_media_and_thumbnail(
         &self,
-        data: &[u8],
+        bytes: EncryptedBytes,
         thumbnail: Option<Thumbnail>,
         send_progress: SharedObservable<TransmissionProgress>,
     ) -> Result<(MediaSource, Option<(MediaSource, Box<ThumbnailInfo>)>)> {
         let upload_thumbnail = self.upload_encrypted_thumbnail(thumbnail, send_progress.clone());
 
         let upload_attachment = async {
-            let mut cursor = Cursor::new(data);
-            self.upload_encrypted_file(&mut cursor)
-                .with_send_progress_observable(send_progress)
-                .await
+            self.upload_encrypted_file(bytes).with_send_progress_observable(send_progress).await
         };
 
         let (thumbnail, file) = try_join(upload_thumbnail, upload_attachment).await?;
@@ -487,10 +494,8 @@ impl Client {
         };
 
         let (data, _, thumbnail_info) = thumbnail.into_parts();
-        let mut cursor = Cursor::new(data);
-
         let file = self
-            .upload_encrypted_file(&mut cursor)
+            .upload_encrypted_file(EncryptedBytes::new(data.into()))
             .with_send_progress_observable(send_progress)
             .await?;
 
