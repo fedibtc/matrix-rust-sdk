@@ -206,7 +206,7 @@ impl Media {
             self.client.request_config().timeout(Self::reasonable_upload_timeout(&data))
         });
 
-        let request = assign!(media::create_content::v3::Request::new(data), {
+        let request = assign!(media::create_content::v3::Request::new(data.into()), {
             content_type: Some(content_type.essence_str().to_owned()),
         });
 

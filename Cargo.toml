@@ -70,7 +70,7 @@ rand = { version = "0.8.5", default-features = false, features = ["std", "std_rn
 regex = { version = "1.12.2", default-features = false }
 reqwest = { version = "0.12.24", default-features = false }
 rmp-serde = { version = "1.3.0", default-features = false }
-ruma = { git = "https://github.com/ruma/ruma", rev = "2455c71ec8bd16318397865d9c6e231e792cb15e", features = [
+ruma = { git = "https://github.com/fedibtc/ruma", tag = "ruma-0.14.1-fedi1", features = [
     "client-api-c",
     "compat-unset-avatar",
     "compat-upload-signatures",
@@ -110,7 +110,7 @@ tracing = { version = "0.1.41", default-features = false, features = ["std"] }
 tracing-appender = { version = "0.2.3", default-features = false }
 tracing-core = { version = "0.1.34", default-features = false }
 tracing-subscriber = { version = "0.3.20", default-features = false, features = ["std", "smallvec", "fmt"] }
-unicode-normalization = { version = "0.1.25", default-features = false }
+unicode-normalization = { version = "0.1", default-features = false }
 unicode-segmentation = { version = "1.12.0", default-features = false }
 uniffi = { version = "0.31.0", default-features = false, features = ["cargo-metadata"] }
 uniffi_bindgen = { version = "0.31.0", default-features = false, features = ["cargo-metadata"] }
