@@ -83,7 +83,7 @@ pub use error::{
 };
 pub use file_encryption::{
     AttachmentDecryptor, AttachmentEncryptor, DecryptorError, KeyExportError, MediaEncryptionInfo,
-    decrypt_room_key_export, encrypt_room_key_export,
+    decrypt_room_key_export, encrypt_attachment_in_place, encrypt_room_key_export,
 };
 pub use gossiping::{GossipRequest, GossippedSecret};
 pub use identities::{
