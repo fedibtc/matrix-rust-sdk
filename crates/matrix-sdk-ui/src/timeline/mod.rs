@@ -806,7 +806,7 @@ pub type TimelineEventFilterFn = dyn Fn(&AnySyncTimelineEvent, &RoomVersionId) -
 ///
 /// The [`AttachmentSource::File`] variant can be constructed from any type that
 /// implements `Into<PathBuf>`.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum AttachmentSource {
     /// The data of the attachment.
     Data {
