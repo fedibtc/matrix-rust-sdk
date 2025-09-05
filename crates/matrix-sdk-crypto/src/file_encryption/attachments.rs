@@ -154,6 +154,43 @@ impl<'a, R: Read + 'a> AttachmentDecryptor<'a, R> {
     }
 }
 
+/// Encrypt the attachment data in place.
+pub fn encrypt_attachment_in_place(bytes: &mut [u8]) -> MediaEncryptionInfo {
+    let mut key = [0u8; KEY_SIZE];
+    let mut iv = [0u8; IV_SIZE];
+
+    let mut rng = thread_rng();
+
+    rng.fill_bytes(&mut key);
+    // Only populate the first 8 bytes with randomness, the rest is 0
+    // initialized for the counter.
+    rng.fill_bytes(&mut iv[0..8]);
+
+    let web_key = JsonWebKey::from(JsonWebKeyInit {
+        kty: "oct".to_owned(),
+        key_ops: vec!["encrypt".to_owned(), "decrypt".to_owned()],
+        alg: "A256CTR".to_owned(),
+        #[allow(clippy::unnecessary_to_owned)]
+        k: Base64::new(key.to_vec()),
+        ext: true,
+    });
+    #[allow(clippy::unnecessary_to_owned)]
+    let encoded_iv = Base64::new(iv.to_vec());
+
+    let key_array = &key.into();
+
+    let mut aes = Aes256Ctr::new(key_array, &iv.into());
+    key.zeroize();
+    let mut sha = Sha256::default();
+    aes.apply_keystream(bytes);
+    sha.update(bytes);
+
+    let hash = sha.finalize();
+    let hashes = BTreeMap::from([("sha256".to_owned(), Base64::new(hash.as_slice().to_owned()))]);
+
+    MediaEncryptionInfo { version: VERSION.to_owned(), hashes, iv: encoded_iv, key: web_key }
+}
+
 /// A wrapper that transparently encrypts anything that implements `Read`.
 pub struct AttachmentEncryptor<'a, R: Read + ?Sized> {
     finished: bool,
