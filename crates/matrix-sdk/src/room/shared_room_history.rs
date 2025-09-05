@@ -74,7 +74,7 @@ pub(super) async fn share_room_history(room: &Room, user_id: OwnedUserId) -> Res
 
     // 3. Upload to the server as an encrypted file
     let json = serde_json::to_vec(&bundle)?;
-    let upload = client.upload_encrypted_file(&mut (json.as_slice())).await?;
+    let upload = client.upload_encrypted_file(json).await?;
 
     info!(
         media_url = ?upload.url,

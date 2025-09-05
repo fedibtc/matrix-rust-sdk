@@ -64,11 +64,7 @@ pub type CrossProcessLockGeneration = u64;
 
 /// Trait used to try to take a lock. Foundation of [`CrossProcessLock`].
 pub trait TryLock {
-    #[cfg(not(target_family = "wasm"))]
     type LockError: Error + Send + Sync;
-
-    #[cfg(target_family = "wasm")]
-    type LockError: Error;
 
     /// Try to take a leased lock.
     ///
@@ -594,12 +590,7 @@ pub enum CrossProcessLockError {
     Unobtained(#[from] CrossProcessLockUnobtained),
 
     #[error(transparent)]
-    #[cfg(not(target_family = "wasm"))]
     TryLock(#[from] Box<dyn Error + Send + Sync>),
-
-    #[error(transparent)]
-    #[cfg(target_family = "wasm")]
-    TryLock(#[from] Box<dyn Error>),
 }
 
 /// The cross-process lock config to use for the various stores.
