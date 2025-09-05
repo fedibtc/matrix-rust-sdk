@@ -58,11 +58,7 @@ use crate::{
 
 /// Trait used to try to take a lock. Foundation of [`CrossProcessLock`].
 pub trait TryLock {
-    #[cfg(not(target_family = "wasm"))]
     type LockError: Error + Send + Sync;
-
-    #[cfg(target_family = "wasm")]
-    type LockError: Error;
 
     /// Try to take a leased lock.
     ///
@@ -356,12 +352,7 @@ pub enum CrossProcessLockError {
     LockTimeout,
 
     #[error(transparent)]
-    #[cfg(not(target_family = "wasm"))]
     TryLockError(#[from] Box<dyn Error + Send + Sync>),
-
-    #[error(transparent)]
-    #[cfg(target_family = "wasm")]
-    TryLockError(Box<dyn Error>),
 }
 
 #[cfg(test)]
