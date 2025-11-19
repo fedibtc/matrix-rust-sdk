@@ -33,6 +33,7 @@ use matrix_sdk_base::{
     linked_chunk::Position,
     sync::{JoinedRoomUpdate, LeftRoomUpdate, Timeline},
 };
+use matrix_sdk_common::BoxFuture;
 use ruma::{
     EventId, OwnedEventId, OwnedRoomId,
     api::Direction,
@@ -60,6 +61,13 @@ pub(super) mod events;
 mod threads;
 
 pub use threads::ThreadEventCacheUpdate;
+
+/// A callback to fire when a batch of events has been persisted.
+#[cfg(target_family = "wasm")]
+pub(crate) type OnBatchPersisted = Arc<dyn for<'a> Fn(Vec<&'a Event>) -> BoxFuture<'a, ()>>;
+#[cfg(not(target_family = "wasm"))]
+pub(crate) type OnBatchPersisted =
+    Arc<dyn for<'a> Fn(Vec<&'a Event>) -> BoxFuture<'a, ()> + Send + Sync>;
 
 /// A subset of an event cache, for a room.
 ///
@@ -637,7 +645,7 @@ mod private {
 
     use super::{
         super::{EventCacheError, deduplicator::DeduplicationOutcome},
-        EventLocation, LoadMoreEventsBackwardsOutcome,
+        EventLocation, LoadMoreEventsBackwardsOutcome, OnBatchPersisted,
         events::EventLinkedChunk,
         sort_positions_descending,
     };
@@ -688,6 +696,9 @@ mod private {
         /// An atomic count of the current number of subscriber of the
         /// [`super::RoomEventCache`].
         pub(super) subscriber_count: Arc<AtomicUsize>,
+
+        /// The callback to fire when a batch of events has been persisted.
+        on_batch_persisted: OnBatchPersisted,
     }
 
     impl RoomEventCacheState {
@@ -707,6 +718,7 @@ mod private {
             linked_chunk_update_sender: Sender<RoomEventCacheLinkedChunkUpdate>,
             store: EventCacheStoreLock,
             pagination_status: SharedObservable<RoomPaginationStatus>,
+            on_batch_persisted: OnBatchPersisted,
         ) -> Result<Self, EventCacheError> {
             let store_lock = store.lock().await?;
 
@@ -779,6 +791,7 @@ mod private {
                 subscriber_count: Default::default(),
                 pagination_status,
                 linked_chunk_update_sender,
+                on_batch_persisted,
             })
         }
 
@@ -1231,12 +1244,34 @@ mod private {
             let store = self.store.clone();
             let room_id = self.room.clone();
             let cloned_updates = updates.clone();
+            let on_batch_persisted = self.on_batch_persisted.clone();
 
             spawn(async move {
                 let store = store.lock().await?;
 
+                // Pre-collect events to notify, to avoid cloning them after move
+                let mut events_to_notify = Vec::new();
+                for update in &cloned_updates {
+                    match update {
+                        Update::PushItems { items, .. } => {
+                            for event in items {
+                                events_to_notify.push(event);
+                            }
+                        }
+                        Update::ReplaceItem { item, .. } => {
+                            events_to_notify.push(item);
+                        }
+                        _ => {}
+                    }
+                }
+
                 trace!(updates = ?cloned_updates, "sending linked chunk updates to the store");
                 let linked_chunk_id = LinkedChunkId::Room(&room_id);
+
+                if !events_to_notify.is_empty() {
+                    on_batch_persisted(events_to_notify).await;
+                }
+
                 store.handle_linked_chunk_updates(linked_chunk_id, cloned_updates).await?;
                 trace!("linked chunk updates applied");
 
