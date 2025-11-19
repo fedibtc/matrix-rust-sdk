@@ -50,6 +50,7 @@ impl Caches {
         linked_chunk_update_sender: Sender<room::RoomEventCacheLinkedChunkUpdate>,
         auto_shrink_sender: mpsc::Sender<OwnedRoomId>,
         store: EventCacheStoreLock,
+        on_batch_persisted: room::OnBatchPersisted,
     ) -> Result<Self> {
         let Some(client) = weak_client.get() else {
             return Err(EventCacheError::ClientDropped);
@@ -84,6 +85,7 @@ impl Caches {
             linked_chunk_update_sender,
             store,
             pagination_status.clone(),
+            on_batch_persisted,
         )
         .await?;
 

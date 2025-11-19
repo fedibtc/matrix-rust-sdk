@@ -36,13 +36,16 @@ use std::{
 
 use futures_util::future::try_join_all;
 use matrix_sdk_base::{
+    SendOutsideWasm, SyncOutsideWasm,
     cross_process_lock::CrossProcessLockError,
+    deserialized_responses::TimelineEvent,
     event_cache::store::{EventCacheStoreError, EventCacheStoreLock, EventCacheStoreLockState},
     linked_chunk::lazy_loader::LazyLoaderError,
     sync::RoomUpdates,
     task_monitor::BackgroundTaskHandle,
     timer,
 };
+use matrix_sdk_common::{BoxFuture, locks::RwLock as StdRwLock};
 use ruma::{OwnedRoomId, RoomId};
 use tokio::sync::{
     Mutex, OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock,
@@ -141,6 +144,17 @@ pub enum EventCacheError {
 
 /// A result using the [`EventCacheError`].
 pub type Result<T> = std::result::Result<T, EventCacheError>;
+
+/// A callback that will be called every time a decrypted event is persisted to
+/// the event cache.
+#[cfg(target_family = "wasm")]
+pub type EventHandler =
+    Arc<dyn for<'a> Fn(&'a RoomId, &'a TimelineEvent) -> BoxFuture<'a, ()> + 'static>;
+/// A callback that will be called every time a decrypted event is persisted to
+/// the event cache.
+#[cfg(not(target_family = "wasm"))]
+pub type EventHandler =
+    Arc<dyn for<'a> Fn(&'a RoomId, &'a TimelineEvent) -> BoxFuture<'a, ()> + Send + Sync + 'static>;
 
 /// Hold handles to the tasks spawn by a [`EventCache`].
 pub struct EventCacheDropHandles {
@@ -243,6 +257,7 @@ impl EventCache {
                 redecryption_channels,
                 #[cfg(feature = "testing")]
                 thread_subscriber_receiver: _thread_subscriber_receiver,
+                event_handlers: Default::default(),
             }),
         }
     }
@@ -256,6 +271,21 @@ impl EventCache {
     /// Get a writable handle to the global configuration of the [`EventCache`].
     pub async fn config_mut(&self) -> impl DerefMut<Target = EventCacheConfig> + '_ {
         self.inner.config.write().await
+    }
+
+    /// Add a hook/callback/event handler that gets called everytime a message
+    /// is persisted to event cache.
+    ///
+    /// The handler is allowed to be called multiple times for same event, but
+    /// we try to avoid calling it multiple times when we can.
+    pub fn add_event_handler<F>(&self, handler: F)
+    where
+        F: for<'a> Fn(&'a RoomId, &'a TimelineEvent) -> BoxFuture<'a, ()>
+            + SendOutsideWasm
+            + SyncOutsideWasm
+            + 'static,
+    {
+        self.inner.event_handlers.write().push(Arc::new(handler));
     }
 
     /// Subscribes to updates that a thread subscription has been sent.
@@ -478,6 +508,10 @@ struct EventCacheInner {
 
     #[cfg(feature = "e2e-encryption")]
     redecryption_channels: redecryptor::RedecryptorChannels,
+
+    /// The list of event handlers that will be called when a decrypted event is
+    /// persisted.
+    event_handlers: Arc<StdRwLock<Vec<EventHandler>>>,
 }
 
 type AutoShrinkChannelPayload = OwnedRoomId;
@@ -637,6 +671,26 @@ impl EventCacheInner {
                         "we must have called `EventCache::subscribe()` before calling here.",
                     ),
                     self.store.clone(),
+                    {
+                        let event_handlers = self.event_handlers.clone();
+                        let room_id = room_id.to_owned();
+                        Arc::new(move |events| {
+                            let event_handlers = event_handlers.clone();
+                            let room_id = room_id.clone();
+                            Box::pin(async move {
+                                if events.is_empty() {
+                                    return;
+                                }
+
+                                let handlers = event_handlers.read().clone();
+                                for event in events {
+                                    for handler in &handlers {
+                                        handler(&room_id, event).await;
+                                    }
+                                }
+                            })
+                        })
+                    },
                 )
                 .await?;
 
