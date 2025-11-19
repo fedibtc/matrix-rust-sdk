@@ -53,6 +53,7 @@ impl Caches {
         auto_shrink_sender: mpsc::Sender<OwnedRoomId>,
         store: EventCacheStoreLock,
         automatic_pagination: Option<AutomaticPagination>,
+        on_batch_persisted: room::OnBatchPersisted,
     ) -> Result<Self> {
         let Some(client) = weak_client.get() else {
             return Err(EventCacheError::ClientDropped);
@@ -88,6 +89,7 @@ impl Caches {
             store,
             pagination_status.clone(),
             automatic_pagination,
+            on_batch_persisted,
         )
         .await?;
 

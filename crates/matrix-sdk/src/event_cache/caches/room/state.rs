@@ -68,7 +68,7 @@ use super::{
         read_receipts::compute_unread_counts,
         thread::ThreadEventCache,
     },
-    EventsOrigin, PostProcessingOrigin, RoomEventCacheGenericUpdate,
+    EventsOrigin, OnBatchPersisted, PostProcessingOrigin, RoomEventCacheGenericUpdate,
     RoomEventCacheLinkedChunkUpdate, RoomEventCacheUpdate, RoomEventCacheUpdateSender,
     sort_positions_descending,
 };
@@ -151,6 +151,9 @@ pub struct RoomEventCacheState {
 
     /// A copy of the automatic pagination API object.
     automatic_pagination: Option<AutomaticPagination>,
+
+    /// The callback to fire when a batch of events has been persisted.
+    on_batch_persisted: OnBatchPersisted,
 }
 
 impl RoomEventCacheState {
@@ -312,6 +315,7 @@ impl LockedRoomEventCacheState {
         store: EventCacheStoreLock,
         pagination_status: SharedObservable<SharedPaginationStatus>,
         automatic_pagination: Option<AutomaticPagination>,
+        on_batch_persisted: OnBatchPersisted,
     ) -> Result<Self, EventCacheError> {
         let store_guard = match store.lock().await? {
             // Lock is clean: all good!
@@ -395,6 +399,7 @@ impl LockedRoomEventCacheState {
             subscriber_count: Default::default(),
             pinned_event_cache: OnceLock::new(),
             automatic_pagination,
+            on_batch_persisted,
         }))
     }
 }
@@ -525,6 +530,7 @@ impl<'a> RoomEventCacheStateLockReadGuard<'a> {
                 room,
                 self.state.linked_chunk_update_sender.clone(),
                 self.state.store.clone(),
+                self.state.on_batch_persisted.clone(),
             )
         });
 
@@ -751,6 +757,7 @@ impl<'a> RoomEventCacheStateLockWriteGuard<'a> {
             &self.store,
             linked_chunk_id,
             &self.state.linked_chunk_update_sender,
+            self.state.on_batch_persisted.clone(),
             updates,
         )
         .await
@@ -1347,13 +1354,19 @@ impl<'a> RoomEventCacheStateLockWriteGuard<'a> {
     ) -> Result<(), EventCacheError> {
         let store = self.store.clone();
         let room_id = self.state.room_id.clone();
+        let on_batch_persisted = self.state.on_batch_persisted.clone();
         let events = events.into_iter().collect::<Vec<_>>();
 
         // Spawn a task so the save is uninterrupted by task cancellation.
         spawn(async move {
-            for event in events {
-                store.save_event(&room_id, event).await?;
+            if !events.is_empty() {
+                on_batch_persisted(events.iter().collect()).await;
             }
+
+            for event in &events {
+                store.save_event(&room_id, event.clone()).await?;
+            }
+
             super::Result::Ok(())
         })
         .await

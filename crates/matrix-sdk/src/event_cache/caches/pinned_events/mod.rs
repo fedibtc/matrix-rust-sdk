@@ -38,7 +38,7 @@ use super::{
     super::{EventCacheError, EventsOrigin, Result, persistence::send_updates_to_store},
     event_linked_chunk::EventLinkedChunk,
     lock,
-    room::RoomEventCacheLinkedChunkUpdate,
+    room::{OnBatchPersisted, RoomEventCacheLinkedChunkUpdate},
 };
 use crate::{
     Room, client::WeakClient, config::RequestConfig, event_cache::TimelineVectorDiffs,
@@ -69,6 +69,9 @@ pub(in super::super) struct PinnedEventCacheState {
     ///
     /// See also [`super::super::EventCacheInner::linked_chunk_update_sender`].
     linked_chunk_update_sender: Sender<RoomEventCacheLinkedChunkUpdate>,
+
+    /// Callback to fire when a batch of pinned events is persisted.
+    on_batch_persisted: OnBatchPersisted,
 }
 
 impl lock::Store for PinnedEventCacheState {
@@ -178,6 +181,7 @@ impl<'a> PinnedEventCacheStateLockWriteGuard<'a> {
             &self.store,
             linked_chunk_id,
             &self.state.linked_chunk_update_sender,
+            self.state.on_batch_persisted.clone(),
             updates,
         )
         .await
@@ -214,6 +218,7 @@ impl PinnedEventCache {
         room: Room,
         linked_chunk_update_sender: Sender<RoomEventCacheLinkedChunkUpdate>,
         store: EventCacheStoreLock,
+        on_batch_persisted: OnBatchPersisted,
     ) -> Self {
         let sender = Sender::new(32);
 
@@ -221,8 +226,14 @@ impl PinnedEventCache {
 
         let chunk = EventLinkedChunk::new();
 
-        let state =
-            PinnedEventCacheState { room_id, chunk, sender, linked_chunk_update_sender, store };
+        let state = PinnedEventCacheState {
+            room_id,
+            chunk,
+            sender,
+            linked_chunk_update_sender,
+            store,
+            on_batch_persisted,
+        };
         let state = Arc::new(PinnedEventCacheStateLock::new_inner(state));
 
         let task = Arc::new(
