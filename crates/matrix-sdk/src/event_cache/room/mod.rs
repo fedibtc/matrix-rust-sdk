@@ -33,6 +33,7 @@ use matrix_sdk_base::{
     linked_chunk::Position,
     sync::{JoinedRoomUpdate, LeftRoomUpdate, Timeline},
 };
+use matrix_sdk_common::BoxFuture;
 use ruma::{
     EventId, OwnedEventId, OwnedRoomId, RoomId,
     api::Direction,
@@ -60,6 +61,13 @@ pub(super) mod events;
 mod threads;
 
 pub use threads::ThreadEventCacheUpdate;
+
+/// A callback to fire when a batch of events has been persisted.
+#[cfg(target_family = "wasm")]
+pub(crate) type OnBatchPersisted = Arc<dyn for<'a> Fn(Vec<&'a Event>) -> BoxFuture<'a, ()>>;
+#[cfg(not(target_family = "wasm"))]
+pub(crate) type OnBatchPersisted =
+    Arc<dyn for<'a> Fn(Vec<&'a Event>) -> BoxFuture<'a, ()> + Send + Sync>;
 
 /// A subset of an event cache, for a room.
 ///
@@ -709,8 +717,8 @@ mod private {
             deduplicator::{DeduplicationOutcome, filter_duplicate_events},
             room::threads::ThreadEventCache,
         },
-        EventLocation, EventsOrigin, LoadMoreEventsBackwardsOutcome, RoomEventCacheGenericUpdate,
-        RoomEventCacheUpdate,
+        EventLocation, EventsOrigin, LoadMoreEventsBackwardsOutcome, OnBatchPersisted,
+        RoomEventCacheGenericUpdate, RoomEventCacheUpdate,
         events::EventLinkedChunk,
         sort_positions_descending,
     };
@@ -777,6 +785,9 @@ mod private {
         /// An atomic count of the current number of subscriber of the
         /// [`super::RoomEventCache`].
         subscriber_count: Arc<AtomicUsize>,
+
+        /// The callback to fire when a batch of events has been persisted.
+        on_batch_persisted: OnBatchPersisted,
     }
 
     impl RoomEventCacheStateLock {
@@ -800,6 +811,7 @@ mod private {
             linked_chunk_update_sender: Sender<RoomEventCacheLinkedChunkUpdate>,
             store: EventCacheStoreLock,
             pagination_status: SharedObservable<RoomPaginationStatus>,
+            on_batch_persisted: OnBatchPersisted,
         ) -> Result<Self, EventCacheError> {
             let store_guard = match store.lock().await? {
                 // Lock is clean: all good!
@@ -884,6 +896,7 @@ mod private {
                     room_version_rules,
                     waited_for_initial_prev_token,
                     subscriber_count: Default::default(),
+                    on_batch_persisted,
                 }),
                 read_lock_acquisition: Mutex::new(()),
             })
@@ -1533,13 +1546,40 @@ mod private {
             // The store cross-process locking involves an actual mutex, which ensures that
             // storing updates happens in the expected order.
 
-            let store = self.store.clone();
+            let store = self.state.store.clone();
             let room_id = self.state.room_id.clone();
             let cloned_updates = updates.clone();
+            let on_batch_persisted = self.state.on_batch_persisted.clone();
 
             spawn(async move {
+                let store = match store.lock().await? {
+                    EventCacheStoreLockState::Clean(guard) => guard,
+                    EventCacheStoreLockState::Dirty(guard) => guard,
+                };
+
+                // Pre-collect events to notify, to avoid cloning them after move
+                let mut events_to_notify = Vec::new();
+                for update in &cloned_updates {
+                    match update {
+                        Update::PushItems { items, .. } => {
+                            for event in items {
+                                events_to_notify.push(event);
+                            }
+                        }
+                        Update::ReplaceItem { item, .. } => {
+                            events_to_notify.push(item);
+                        }
+                        _ => {}
+                    }
+                }
+
                 trace!(updates = ?cloned_updates, "sending linked chunk updates to the store");
                 let linked_chunk_id = LinkedChunkId::Room(&room_id);
+
+                if !events_to_notify.is_empty() {
+                    on_batch_persisted(events_to_notify).await;
+                }
+
                 store.handle_linked_chunk_updates(linked_chunk_id, cloned_updates).await?;
                 trace!("linked chunk updates applied");
 
