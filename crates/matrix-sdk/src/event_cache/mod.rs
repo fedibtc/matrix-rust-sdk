@@ -33,6 +33,8 @@ use std::{
     sync::{Arc, OnceLock, Weak},
 };
 
+use matrix_sdk_common::locks::RwLock as StdRwLock;
+
 use eyeball::{SharedObservable, Subscriber};
 use eyeball_im::VectorDiff;
 use futures_util::future::{join_all, try_join_all};
@@ -51,7 +53,8 @@ use matrix_sdk_base::{
     timer,
 };
 use matrix_sdk_common::executor::{JoinHandle, spawn};
-use room::RoomEventCacheState;
+use matrix_sdk_common::BoxFuture;
+use room::{OnBatchPersisted, RoomEventCacheState};
 use ruma::{
     OwnedEventId, OwnedRoomId, OwnedTransactionId, RoomId, events::AnySyncEphemeralRoomEvent,
     serde::Raw,
@@ -142,6 +145,15 @@ pub enum EventCacheError {
 /// A result using the [`EventCacheError`].
 pub type Result<T> = std::result::Result<T, EventCacheError>;
 
+/// A callback that will be called every time a decrypted event is persisted to
+/// the event cache.
+#[cfg(target_family = "wasm")]
+pub type EventHandler =
+    Arc<dyn for<'a> Fn(&'a RoomId, &'a TimelineEvent) -> BoxFuture<'a, ()> + 'static>;
+#[cfg(not(target_family = "wasm"))]
+pub type EventHandler =
+    Arc<dyn for<'a> Fn(&'a RoomId, &'a TimelineEvent) -> BoxFuture<'a, ()> + Send + Sync + 'static>;
+
 /// Hold handles to the tasks spawn by a [`EventCache`].
 pub struct EventCacheDropHandles {
     /// Task that listens to room updates.
@@ -227,8 +239,21 @@ impl EventCache {
                 #[cfg(feature = "e2e-encryption")]
                 redecryption_channels,
                 thread_subscriber_receiver,
+                event_handlers: Default::default(),
             }),
         }
+    }
+
+    /// Add a hook/callback/event handler that gets called everytime a message is
+    /// persisted to event cache.
+    ///
+    /// The handler is allowed to be called multiple times for same event, but we
+    /// try to avoid calling it multiple times when we can.
+    pub fn add_event_handler<F>(&self, handler: F)
+    where
+        F: for<'a> Fn(&'a RoomId, &'a TimelineEvent) -> BoxFuture<'a, ()> + Send + Sync + 'static,
+    {
+        self.inner.event_handlers.write().push(Arc::new(handler));
     }
 
     /// Subscribes to updates that a thread subscription has been sent.
@@ -872,6 +897,10 @@ struct EventCacheInner {
 
     #[cfg(feature = "e2e-encryption")]
     redecryption_channels: redecryptor::RedecryptorChannels,
+
+    /// The list of event handlers that will be called when a decrypted event is
+    /// persisted.
+    event_handlers: Arc<StdRwLock<Vec<EventHandler>>>,
 }
 
 type AutoShrinkChannelPayload = OwnedRoomId;
@@ -1037,6 +1066,24 @@ impl EventCacheInner {
                     ThreadingSupport::Enabled { .. }
                 );
 
+                let event_handlers = self.event_handlers.clone();
+                let room_id_for_handler = room_id.to_owned();
+                let on_batch_persisted: OnBatchPersisted =
+                    Arc::new(move |events: Vec<&TimelineEvent>| {
+                        let event_handlers = event_handlers.clone();
+                        let room_id = room_id_for_handler.clone();
+                        Box::pin(async move {
+                            if !events.is_empty() {
+                                let handlers = event_handlers.read().clone();
+                                for event in events {
+                                    for handler in handlers.iter() {
+                                        handler(&room_id, event).await;
+                                    }
+                                }
+                            }
+                        })
+                    });
+
                 let room_state = RoomEventCacheState::new(
                     room_id.to_owned(),
                     room_version_rules,
@@ -1044,6 +1091,7 @@ impl EventCacheInner {
                     self.linked_chunk_update_sender.clone(),
                     self.store.clone(),
                     pagination_status.clone(),
+                    on_batch_persisted,
                 )
                 .await?;
 
