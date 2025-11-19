@@ -22,7 +22,10 @@ use ruma::serde::Raw;
 use tokio::sync::broadcast::Sender;
 use tracing::trace;
 
-use crate::event_cache::{Result, caches::room::RoomEventCacheLinkedChunkUpdate};
+use crate::event_cache::{
+    Result,
+    caches::room::{OnBatchPersisted, RoomEventCacheLinkedChunkUpdate},
+};
 
 /// Propagate linked chunk updates to the store and to the linked chunk update
 /// observers.
@@ -30,6 +33,7 @@ pub(super) async fn send_updates_to_store(
     store: &EventCacheStoreLockGuard,
     linked_chunk_id: OwnedLinkedChunkId,
     linked_chunk_update_sender: &Sender<RoomEventCacheLinkedChunkUpdate>,
+    on_batch_persisted: OnBatchPersisted,
     mut updates: Vec<Update<Event, Gap>>,
 ) -> Result<()> {
     if updates.is_empty() {
@@ -72,10 +76,35 @@ pub(super) async fn send_updates_to_store(
 
     let store = store.clone();
     let cloned_updates = updates.clone();
+    let notify_updates = updates.clone();
     let cloned_linked_chunk_id = linked_chunk_id.clone();
 
     spawn(async move {
         trace!(updates = ?cloned_updates, "sending linked chunk updates to the store");
+
+        let mut events_to_notify = Vec::new();
+        for update in &notify_updates {
+            match update {
+                Update::PushItems { items, .. } => {
+                    for event in items {
+                        events_to_notify.push(event);
+                    }
+                }
+                Update::ReplaceItem { item, .. } => events_to_notify.push(item),
+                Update::NewItemsChunk { .. }
+                | Update::NewGapChunk { .. }
+                | Update::RemoveChunk(_)
+                | Update::RemoveItem { .. }
+                | Update::DetachLastItems { .. }
+                | Update::StartReattachItems
+                | Update::EndReattachItems
+                | Update::Clear => {}
+            }
+        }
+
+        if !events_to_notify.is_empty() {
+            on_batch_persisted(events_to_notify).await;
+        }
 
         store.handle_linked_chunk_updates(cloned_linked_chunk_id.as_ref(), cloned_updates).await?;
         trace!("linked chunk updates applied");

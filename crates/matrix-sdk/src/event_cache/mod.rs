@@ -37,14 +37,16 @@ use std::{
 use eyeball::SharedObservable;
 use futures_util::future::{join_all, try_join_all};
 use matrix_sdk_base::{
-    ThreadingSupport,
+    SendOutsideWasm, SyncOutsideWasm, ThreadingSupport,
     cross_process_lock::CrossProcessLockError,
+    deserialized_responses::TimelineEvent,
     event_cache::store::{EventCacheStoreError, EventCacheStoreLock, EventCacheStoreLockState},
     linked_chunk::lazy_loader::LazyLoaderError,
     sync::RoomUpdates,
     task_monitor::BackgroundTaskHandle,
     timer,
 };
+use matrix_sdk_common::{BoxFuture, locks::RwLock as StdRwLock};
 use ruma::{OwnedRoomId, RoomId};
 use tokio::sync::{
     Mutex, RwLock,
@@ -148,6 +150,17 @@ pub enum EventCacheError {
 /// A result using the [`EventCacheError`].
 pub type Result<T> = std::result::Result<T, EventCacheError>;
 
+/// A callback that will be called every time a decrypted event is persisted to
+/// the event cache.
+#[cfg(target_family = "wasm")]
+pub type EventHandler =
+    Arc<dyn for<'a> Fn(&'a RoomId, &'a TimelineEvent) -> BoxFuture<'a, ()> + 'static>;
+/// A callback that will be called every time a decrypted event is persisted to
+/// the event cache.
+#[cfg(not(target_family = "wasm"))]
+pub type EventHandler =
+    Arc<dyn for<'a> Fn(&'a RoomId, &'a TimelineEvent) -> BoxFuture<'a, ()> + Send + Sync + 'static>;
+
 /// Hold handles to the tasks spawn by a [`EventCache`].
 pub struct EventCacheDropHandles {
     /// Task that listens to room updates.
@@ -248,6 +261,7 @@ impl EventCache {
                 #[cfg(feature = "e2e-encryption")]
                 redecryption_channels,
                 thread_subscriber_receiver,
+                event_handlers: Default::default(),
             }),
         }
     }
@@ -261,6 +275,21 @@ impl EventCache {
     /// Get a writable handle to the global configuration of the [`EventCache`].
     pub async fn config_mut(&self) -> impl DerefMut<Target = EventCacheConfig> + '_ {
         self.inner.config.write().await
+    }
+
+    /// Add a hook/callback/event handler that gets called everytime a message
+    /// is persisted to event cache.
+    ///
+    /// The handler is allowed to be called multiple times for same event, but
+    /// we try to avoid calling it multiple times when we can.
+    pub fn add_event_handler<F>(&self, handler: F)
+    where
+        F: for<'a> Fn(&'a RoomId, &'a TimelineEvent) -> BoxFuture<'a, ()>
+            + SendOutsideWasm
+            + SyncOutsideWasm
+            + 'static,
+    {
+        self.inner.event_handlers.write().push(Arc::new(handler));
     }
 
     /// Subscribes to updates that a thread subscription has been sent.
@@ -478,6 +507,10 @@ struct EventCacheInner {
 
     #[cfg(feature = "e2e-encryption")]
     redecryption_channels: redecryptor::RedecryptorChannels,
+
+    /// The list of event handlers that will be called when a decrypted event is
+    /// persisted.
+    event_handlers: Arc<StdRwLock<Vec<EventHandler>>>,
 }
 
 type AutoShrinkChannelPayload = OwnedRoomId;
@@ -655,6 +688,24 @@ impl EventCacheInner {
                     self.generic_update_sender.clone(),
                 );
 
+                let event_handlers = self.event_handlers.clone();
+                let room_id_for_handler = room_id.to_owned();
+                let on_batch_persisted: caches::room::OnBatchPersisted =
+                    Arc::new(move |events: Vec<&TimelineEvent>| {
+                        let event_handlers = event_handlers.clone();
+                        let room_id = room_id_for_handler.clone();
+                        Box::pin(async move {
+                            if !events.is_empty() {
+                                let handlers = event_handlers.read().clone();
+                                for event in events {
+                                    for handler in handlers.iter() {
+                                        handler(&room_id, event).await;
+                                    }
+                                }
+                            }
+                        })
+                    });
+
                 let own_user_id =
                     client.user_id().expect("the user must be logged in, at this point").to_owned();
                 let room_state = RoomEventCacheStateLock::new(
@@ -666,6 +717,7 @@ impl EventCacheInner {
                     self.linked_chunk_update_sender.clone(),
                     self.store.clone(),
                     pagination_status.clone(),
+                    on_batch_persisted,
                 )
                 .await?;
 
