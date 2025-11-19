@@ -59,7 +59,8 @@ use super::{
         },
         subscriber::SubscribersHandle,
     },
-    RoomEventCacheLinkedChunkUpdate, RoomEventCacheUpdateSender, sort_positions_descending,
+    OnBatchPersisted, RoomEventCacheLinkedChunkUpdate, RoomEventCacheUpdateSender,
+    sort_positions_descending,
 };
 #[cfg(feature = "e2e-encryption")]
 use crate::event_cache::redecryptor;
@@ -108,6 +109,9 @@ pub struct RoomEventCacheState {
 
     /// A handle to the shared back-pagination queue.
     back_pagination_queue: Option<BackPaginationQueue>,
+
+    /// The callback to fire when a batch of events has been persisted.
+    on_batch_persisted: OnBatchPersisted,
 }
 
 impl RoomEventCacheState {
@@ -133,6 +137,7 @@ impl RoomEventCacheState {
         store_guard: EventCacheStoreLockGuard,
         pagination_status: SharedObservable<SharedPaginationStatus>,
         back_pagination_queue: Option<BackPaginationQueue>,
+        on_batch_persisted: OnBatchPersisted,
     ) -> Result<Self, EventCacheError> {
         let linked_chunk_id = LinkedChunkId::Room(&room_id);
 
@@ -194,6 +199,7 @@ impl RoomEventCacheState {
             waited_for_initial_prev_token: false,
             subscribers_handle: Default::default(),
             back_pagination_queue,
+            on_batch_persisted,
         })
     }
 
@@ -505,6 +511,7 @@ impl<'a> StateLockWriteGuard<'a, RoomEventCacheState> {
             &self.store,
             linked_chunk_id,
             &self.state.linked_chunk_update_sender,
+            self.state.on_batch_persisted.clone(),
             updates,
         )
         .await
@@ -809,13 +816,19 @@ impl<'a> StateLockWriteGuard<'a, RoomEventCacheState> {
     ) -> Result<(), EventCacheError> {
         let store = self.store.clone();
         let room_id = self.state.room_id.clone();
+        let on_batch_persisted = self.state.on_batch_persisted.clone();
         let events = events.into_iter().collect::<Vec<_>>();
 
         // Spawn a task so the save is uninterrupted by task cancellation.
         spawn(async move {
-            for event in events {
-                store.save_event(&room_id, event).await?;
+            if !events.is_empty() {
+                on_batch_persisted(events.iter().collect()).await;
             }
+
+            for event in &events {
+                store.save_event(&room_id, event.clone()).await?;
+            }
+
             super::Result::Ok(())
         })
         .await

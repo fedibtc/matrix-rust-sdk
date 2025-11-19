@@ -50,7 +50,7 @@ use super::{
     },
     EventLocation, TimelineVectorDiffs,
     event_linked_chunk::{EventLinkedChunk, sort_positions_descending},
-    room::RoomEventCacheLinkedChunkUpdate,
+    room::{OnBatchPersisted, RoomEventCacheLinkedChunkUpdate},
 };
 use crate::{Room, config::RequestConfig, room::WeakRoom};
 
@@ -80,6 +80,9 @@ pub struct PinnedEventsCacheState {
     ///
     /// See also [`super::super::EventCacheInner::linked_chunk_update_sender`].
     linked_chunk_update_sender: Sender<RoomEventCacheLinkedChunkUpdate>,
+
+    /// Callback to fire when a batch of pinned events is persisted.
+    on_batch_persisted: OnBatchPersisted,
 }
 
 #[cfg(not(tarpaulin_include))]
@@ -405,6 +408,7 @@ impl<'a> StateLockWriteGuard<'a, PinnedEventsCacheState> {
             &self.store,
             linked_chunk_id,
             &self.state.linked_chunk_update_sender,
+            self.state.on_batch_persisted.clone(),
             updates,
         )
         .await
@@ -491,6 +495,7 @@ impl PinnedEventsCache {
         own_user_id: OwnedUserId,
         room_version_rules: RoomVersionRules,
         linked_chunk_update_sender: Sender<RoomEventCacheLinkedChunkUpdate>,
+        on_batch_persisted: OnBatchPersisted,
         state: &StateLock,
     ) -> Result<Self> {
         let room = weak_room.get().ok_or(EventCacheError::ClientDropped)?;
@@ -507,6 +512,7 @@ impl PinnedEventsCache {
                         chunk: EventLinkedChunk::new(),
                         update_sender: PinnedEventsCacheUpdateSender::new(),
                         linked_chunk_update_sender,
+                        on_batch_persisted,
                     })
                 },
             )

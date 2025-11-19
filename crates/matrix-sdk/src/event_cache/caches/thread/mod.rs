@@ -46,7 +46,7 @@ use super::{
     },
     EventsOrigin, TimelineVectorDiffs,
     read_receipts::MaybeReceiptEventContent,
-    room::{RoomEventCacheGenericUpdate, RoomEventCacheLinkedChunkUpdate},
+    room::{OnBatchPersisted, RoomEventCacheGenericUpdate, RoomEventCacheLinkedChunkUpdate},
     subscriber::{AutoShrinkMessage, Subscriber},
 };
 use crate::room::WeakRoom;
@@ -105,6 +105,7 @@ impl ThreadEventCache {
         auto_shrink_sender: mpsc::Sender<AutoShrinkMessage>,
         generic_update_sender: Sender<RoomEventCacheGenericUpdate>,
         linked_chunk_update_sender: Sender<RoomEventCacheLinkedChunkUpdate>,
+        on_batch_persisted: OnBatchPersisted,
     ) -> Result<Self> {
         let update_sender = ThreadEventCacheUpdateSender::new(generic_update_sender.clone());
 
@@ -126,6 +127,7 @@ impl ThreadEventCache {
                         store_guard,
                         update_sender.clone(),
                         linked_chunk_update_sender,
+                        on_batch_persisted,
                     )
                     .await?;
 

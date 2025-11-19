@@ -36,7 +36,9 @@ use std::{
 };
 
 use matrix_sdk_base::{
+    SendOutsideWasm, SyncOutsideWasm,
     cross_process_lock::{CrossProcessLockError, MappedCrossProcessLockState},
+    deserialized_responses::TimelineEvent,
     event_cache::{
         store::{EventCacheStoreError, EventCacheStoreLock},
         thread::ThreadInfo,
@@ -45,6 +47,7 @@ use matrix_sdk_base::{
     sync::RoomUpdates,
     task_monitor::BackgroundTaskHandle,
 };
+use matrix_sdk_common::{BoxFuture, locks::RwLock as EventHandlersRwLock};
 use ruma::{EventId, OwnedEventId, OwnedRoomId, RoomId};
 use tokio::sync::{
     OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock,
@@ -181,6 +184,17 @@ pub enum EventCacheError {
 
 /// A result using the [`EventCacheError`].
 pub type Result<T> = std::result::Result<T, EventCacheError>;
+
+/// A callback that will be called every time a decrypted event is persisted to
+/// the event cache.
+#[cfg(target_family = "wasm")]
+pub type EventHandler =
+    Arc<dyn for<'a> Fn(&'a RoomId, &'a TimelineEvent) -> BoxFuture<'a, ()> + 'static>;
+/// A callback that will be called every time a decrypted event is persisted to
+/// the event cache.
+#[cfg(not(target_family = "wasm"))]
+pub type EventHandler =
+    Arc<dyn for<'a> Fn(&'a RoomId, &'a TimelineEvent) -> BoxFuture<'a, ()> + Send + Sync + 'static>;
 
 /// Hold handles to the tasks spawn by a [`EventCache`].
 pub struct EventCacheDropHandles {
@@ -359,6 +373,7 @@ impl EventCache {
             enable_automatic_back_pagination,
             back_pagination_queue: OnceLock::new(),
             thread_subscriber_sender,
+            event_handlers: Default::default(),
         });
 
         let drop_handles = Arc::new(EventCacheDropHandles::new(
@@ -412,6 +427,21 @@ impl EventCache {
         });
 
         Ok(())
+    }
+
+    /// Add a hook/callback/event handler that gets called everytime a message
+    /// is persisted to event cache.
+    ///
+    /// The handler is allowed to be called multiple times for same event, but
+    /// we try to avoid calling it multiple times when we can.
+    pub fn add_event_handler<F>(&self, handler: F)
+    where
+        F: for<'a> Fn(&'a RoomId, &'a TimelineEvent) -> BoxFuture<'a, ()>
+            + SendOutsideWasm
+            + SyncOutsideWasm
+            + 'static,
+    {
+        self.inner.event_handlers.write().push(Arc::new(handler));
     }
 
     /// Subscribes to updates that a thread subscription has been sent.
@@ -660,6 +690,10 @@ struct EventCacheInner {
     /// Deferred initialization: spawned at subscription time, if
     /// `enable_automatic_back_pagination` is set.
     back_pagination_queue: OnceLock<BackPaginationQueue>,
+
+    /// The list of event handlers that will be called when a decrypted event is
+    /// persisted.
+    event_handlers: Arc<EventHandlersRwLock<Vec<EventHandler>>>,
 }
 
 impl EventCacheInner {
@@ -798,6 +832,26 @@ impl EventCacheInner {
                     self.auto_shrink_sender.clone(),
                     &self.state,
                     self.back_pagination_queue.get().cloned(),
+                    {
+                        let event_handlers = self.event_handlers.clone();
+                        let room_id = room_id.to_owned();
+                        Arc::new(move |events| {
+                            let event_handlers = event_handlers.clone();
+                            let room_id = room_id.clone();
+                            Box::pin(async move {
+                                if events.is_empty() {
+                                    return;
+                                }
+
+                                let handlers = event_handlers.read().clone();
+                                for event in events {
+                                    for handler in &handlers {
+                                        handler(&room_id, event).await;
+                                    }
+                                }
+                            })
+                        })
+                    },
                 )
                 .await?;
 

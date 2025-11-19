@@ -24,6 +24,7 @@ use matrix_sdk_base::{
     event_cache::Event,
     sync::Timeline,
 };
+use matrix_sdk_common::BoxFuture;
 use ruma::{
     EventId, OwnedEventId, OwnedMxcUri, OwnedRoomId, OwnedUserId, RoomId,
     events::{AnyRoomAccountDataEvent, relation::RelationType},
@@ -52,6 +53,14 @@ use super::{
     subscriber::{AutoShrinkMessage, Subscriber},
 };
 use crate::room::WeakRoom;
+
+/// A callback to fire when a batch of events has been persisted.
+#[cfg(target_family = "wasm")]
+pub(in super::super) type OnBatchPersisted =
+    Arc<dyn for<'a> Fn(Vec<&'a Event>) -> BoxFuture<'a, ()>>;
+#[cfg(not(target_family = "wasm"))]
+pub(in super::super) type OnBatchPersisted =
+    Arc<dyn for<'a> Fn(Vec<&'a Event>) -> BoxFuture<'a, ()> + Send + Sync>;
 
 /// A subset of an event cache, for a room.
 ///

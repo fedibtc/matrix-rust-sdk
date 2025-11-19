@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::HashMap, ops::Not, sync::Arc};
+use std::{collections::HashMap, fmt, ops::Not, sync::Arc};
 
 use eyeball::SharedObservable;
 use eyeball_im::VectorDiff;
@@ -73,12 +73,24 @@ pub(super) struct Caches {
     internals: CachesInternals,
 }
 
-#[derive(Debug)]
 struct CachesInternals {
     state: states::StateLock,
     auto_shrink_sender: mpsc::Sender<AutoShrinkMessage>,
     linked_chunk_update_sender: Sender<room::RoomEventCacheLinkedChunkUpdate>,
     room_version_rules: RoomVersionRules,
+    on_batch_persisted: room::OnBatchPersisted,
+}
+
+#[cfg(not(tarpaulin_include))]
+impl fmt::Debug for CachesInternals {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CachesInternals")
+            .field("state", &self.state)
+            .field("auto_shrink_sender", &self.auto_shrink_sender)
+            .field("linked_chunk_update_sender", &self.linked_chunk_update_sender)
+            .field("room_version_rules", &self.room_version_rules)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Caches {
@@ -91,6 +103,7 @@ impl Caches {
         auto_shrink_sender: mpsc::Sender<AutoShrinkMessage>,
         state: &states::StateLock,
         back_pagination_queue: Option<BackPaginationQueue>,
+        on_batch_persisted: room::OnBatchPersisted,
     ) -> Result<Self> {
         let Some(client) = weak_client.get() else {
             return Err(EventCacheError::ClientDropped);
@@ -136,6 +149,7 @@ impl Caches {
                         store_guard,
                         pagination_status.clone(),
                         back_pagination_queue,
+                        on_batch_persisted.clone(),
                     )
                     .await?;
 
@@ -174,6 +188,7 @@ impl Caches {
                 auto_shrink_sender,
                 linked_chunk_update_sender,
                 room_version_rules,
+                on_batch_persisted,
             },
         })
     }
@@ -221,6 +236,7 @@ impl Caches {
                         self.internals.auto_shrink_sender.clone(),
                         room.update_sender().generic_update_sender().clone(),
                         self.internals.linked_chunk_update_sender.clone(),
+                        self.internals.on_batch_persisted.clone(),
                     )
                     .await?;
 
@@ -245,6 +261,7 @@ impl Caches {
                     self.room.own_user_id().clone(),
                     self.internals.room_version_rules.clone(),
                     self.internals.linked_chunk_update_sender.clone(),
+                    self.internals.on_batch_persisted.clone(),
                     &self.internals.state,
                 )
             })

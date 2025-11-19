@@ -56,7 +56,7 @@ use super::{
         read_receipts::{
             MaybeReceiptEventContent, ThreadReadReceiptEventFilter, compute_unread_counts,
         },
-        room::RoomEventCacheLinkedChunkUpdate,
+        room::{OnBatchPersisted, RoomEventCacheLinkedChunkUpdate},
         subscriber::SubscribersHandle,
     },
     ThreadEventCacheUpdateSender,
@@ -100,6 +100,9 @@ pub struct ThreadEventCacheState {
     /// See also [`super::super::EventCacheInner::linked_chunk_update_sender`].
     linked_chunk_update_sender: Sender<RoomEventCacheLinkedChunkUpdate>,
 
+    /// The callback to fire when a batch of events has been persisted.
+    on_batch_persisted: OnBatchPersisted,
+
     /// Have we ever waited for a previous-batch-token to come from sync, in the
     /// context of pagination? We do this at most once per room/thread (?), the
     /// first time we try to run backward pagination. We reset that upon
@@ -131,6 +134,7 @@ impl ThreadEventCacheState {
         store_guard: EventCacheStoreLockGuard,
         update_sender: ThreadEventCacheUpdateSender,
         linked_chunk_update_sender: Sender<RoomEventCacheLinkedChunkUpdate>,
+        on_batch_persisted: OnBatchPersisted,
     ) -> Result<Self> {
         let linked_chunk_id = LinkedChunkId::Thread(&room_id, &thread_id);
 
@@ -198,6 +202,7 @@ impl ThreadEventCacheState {
             thread_info: SharedObservable::new_async(thread_info),
             update_sender,
             linked_chunk_update_sender,
+            on_batch_persisted,
             waited_for_initial_prev_token: false,
             subscribers_handle: SubscribersHandle::default(),
         })
@@ -289,8 +294,14 @@ impl ThreadEventCacheState {
         let linked_chunk_id =
             OwnedLinkedChunkId::Thread(self.room_id.clone(), self.thread_id.clone());
 
-        send_updates_to_store(store, linked_chunk_id, &self.linked_chunk_update_sender, updates)
-            .await
+        send_updates_to_store(
+            store,
+            linked_chunk_id,
+            &self.linked_chunk_update_sender,
+            self.on_batch_persisted.clone(),
+            updates,
+        )
+        .await
     }
 }
 
