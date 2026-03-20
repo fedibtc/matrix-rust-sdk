@@ -432,9 +432,9 @@ impl PinnedEventCache {
             // Compare to the current linked chunk.
             let current_set = guard.state.current_event_ids().into_iter().collect::<BTreeSet<_>>();
 
-            if !new_list.is_empty()
-                && new_list.iter().all(|event_id| current_set.contains(event_id))
-            {
+            let new_set = new_list.iter().cloned().collect::<BTreeSet<_>>();
+
+            if new_set == current_set {
                 // All the events in the pinned list are the same, don't reload.
                 continue;
             }
