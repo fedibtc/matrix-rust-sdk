@@ -149,8 +149,9 @@ impl<'a> PinnedEventCacheStateLockWriteGuard<'a> {
         trace!("resetting all pinned events in linked chunk");
 
         let previous_pinned_event_ids = self.state.current_event_ids();
+        let new_pinned_event_ids = new_events.iter().filter_map(|e| e.event_id()).collect::<Vec<_>>();
 
-        if new_events.iter().filter_map(|e| e.event_id()).collect::<BTreeSet<_>>()
+        if new_pinned_event_ids.iter().cloned().collect::<BTreeSet<_>>()
             == previous_pinned_event_ids.iter().cloned().collect()
         {
             // No change in the list of pinned events.
@@ -431,9 +432,9 @@ impl PinnedEventCache {
             // Compare to the current linked chunk.
             let current_set = guard.state.current_event_ids().into_iter().collect::<BTreeSet<_>>();
 
-            if !new_list.is_empty()
-                && new_list.iter().all(|event_id| current_set.contains(event_id))
-            {
+            let new_set = new_list.iter().cloned().collect::<BTreeSet<_>>();
+
+            if new_set == current_set {
                 // All the events in the pinned list are the same, don't reload.
                 continue;
             }
