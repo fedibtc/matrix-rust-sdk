@@ -16,9 +16,7 @@
 
 //! Types to interact with the native Matrix authentication API.
 
-#[cfg(feature = "sso-login")]
-use std::future::Future;
-use std::{borrow::Cow, fmt};
+use std::{borrow::Cow, fmt, future::Future};
 
 use matrix_sdk_base::{SessionMeta, store::RoomLoadSettings};
 use ruma::{
@@ -32,6 +30,7 @@ use ruma::{
             },
             uiaa::{MatrixUserIdentifier, UserIdentifier},
         },
+        error::ErrorKind,
     },
     serde::JsonObject,
 };
@@ -41,8 +40,9 @@ use tracing::{debug, error, info, instrument};
 
 use crate::{
     Client, Error, RefreshTokenError, Result,
-    authentication::AuthData,
+    authentication::{AuthData, SessionCallbackError},
     client::SessionChange,
+    config::RequestConfig,
     error::{HttpError, HttpResult},
     utils::UrlOrQuery,
 };
@@ -73,6 +73,79 @@ pub enum SsoError {
 impl MatrixAuth {
     pub(crate) fn new(client: Client) -> Self {
         Self { client }
+    }
+
+    /// Set an async callback to recover a Matrix session by logging in again
+    /// with the same account.
+    ///
+    /// The callback is used when automatic token refresh is enabled and the
+    /// current session either doesn't have a refresh token or its refresh token
+    /// has itself expired. The callback receives a copy of the current session
+    /// metadata and should return a login request for the same Matrix account
+    /// as the active session.
+    ///
+    /// The SDK will then:
+    ///
+    /// - reuse the current device ID, regardless of the callback request,
+    /// - replace the session tokens in place,
+    /// - persist them via the save-session callback, if configured,
+    /// - and retry the original request that hit `M_UNKNOWN_TOKEN`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the callback was already set before.
+    #[cfg(not(target_family = "wasm"))]
+    pub fn set_session_reauth_callback<F, Fut, E>(&self, callback: F) -> Result<()>
+    where
+        F: Fn(SessionMeta) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = std::result::Result<login::v3::Request, E>> + Send + 'static,
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        let callback = std::sync::Arc::new(callback);
+        self.client
+            .auth_ctx()
+            .reauth_session_callback
+            .set(Box::new(move |session_meta| {
+                let callback = callback.clone();
+                Box::pin(async move {
+                    callback(session_meta).await.map_err(|err| {
+                        let err: SessionCallbackError = Box::new(err);
+                        err
+                    })
+                })
+            }))
+            .map_err(|_| Error::MultipleSessionReauthCallbacks)?;
+
+        Ok(())
+    }
+
+    /// Set an async callback to recover a Matrix session by logging in again
+    /// with the same account.
+    ///
+    /// See the non-wasm variant of this method for details.
+    #[cfg(target_family = "wasm")]
+    pub fn set_session_reauth_callback<F, Fut, E>(&self, callback: F) -> Result<()>
+    where
+        F: Fn(SessionMeta) -> Fut + 'static,
+        Fut: Future<Output = std::result::Result<login::v3::Request, E>> + 'static,
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        let callback = std::sync::Arc::new(callback);
+        self.client
+            .auth_ctx()
+            .reauth_session_callback
+            .set(Box::new(move |session_meta| {
+                let callback = callback.clone();
+                Box::pin(async move {
+                    callback(session_meta).await.map_err(|err| {
+                        let err: SessionCallbackError = Box::new(err);
+                        err
+                    })
+                })
+            }))
+            .map_err(|_| Error::MultipleSessionReauthCallbacks)?;
+
+        Ok(())
     }
 
     /// Gets the homeserver’s supported login types.
@@ -522,24 +595,9 @@ impl MatrixAuth {
             return refresh_token_lock.lock().await.clone();
         };
 
-        let Some(mut session_tokens) = self.client.session_tokens() else {
-            fail!(guard, RefreshTokenError::RefreshTokenRequired);
-        };
-        let Some(refresh_token) = session_tokens.refresh_token.clone() else {
-            fail!(guard, RefreshTokenError::RefreshTokenRequired);
-        };
-
-        let request = refresh_token::v3::Request::new(refresh_token);
-        let res = self.client.send_inner(request, None, Default::default()).await;
-
-        match res {
-            Ok(res) => {
+        match self.refresh_or_reauthenticate().await {
+            Ok(session_tokens) => {
                 *guard = Ok(());
-
-                session_tokens.access_token = res.access_token;
-                if let Some(refresh_token) = res.refresh_token {
-                    session_tokens.refresh_token = Some(refresh_token);
-                }
 
                 self.client.auth_ctx().set_session_tokens(session_tokens);
 
@@ -560,10 +618,102 @@ impl MatrixAuth {
                 Ok(())
             }
             Err(error) => {
-                let error = RefreshTokenError::MatrixAuth(error.into());
                 fail!(guard, error);
             }
         }
+    }
+
+    async fn refresh_or_reauthenticate(&self) -> Result<SessionTokens, RefreshTokenError> {
+        let Some(session_tokens) = self.client.session_tokens() else {
+            return Err(RefreshTokenError::RefreshTokenRequired);
+        };
+
+        let refresh_result = match session_tokens.refresh_token.clone() {
+            Some(refresh_token) => {
+                self.refresh_session_tokens(session_tokens.clone(), refresh_token).await
+            }
+            None => Err(RefreshTokenError::RefreshTokenRequired),
+        };
+
+        match refresh_result {
+            Ok(session_tokens) => Ok(session_tokens),
+            Err(error) if self.can_reauthenticate_after(&error) => {
+                self.reauthenticate_session().await
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    async fn refresh_session_tokens(
+        &self,
+        mut session_tokens: SessionTokens,
+        refresh_token: String,
+    ) -> Result<SessionTokens, RefreshTokenError> {
+        let request = refresh_token::v3::Request::new(refresh_token);
+        let res = self.client.send_inner(request, None, Default::default()).await;
+
+        match res {
+            Ok(res) => {
+                session_tokens.access_token = res.access_token;
+                if let Some(refresh_token) = res.refresh_token {
+                    session_tokens.refresh_token = Some(refresh_token);
+                }
+
+                Ok(session_tokens)
+            }
+            Err(error) => Err(RefreshTokenError::MatrixAuth(error.into())),
+        }
+    }
+
+    fn can_reauthenticate_after(&self, error: &RefreshTokenError) -> bool {
+        self.client.auth_ctx().reauth_session_callback.get().is_some()
+            && match error {
+                RefreshTokenError::RefreshTokenRequired => true,
+                RefreshTokenError::MatrixAuth(http_err) => matches!(
+                    http_err.client_api_error_kind(),
+                    Some(ErrorKind::UnknownToken(_) | ErrorKind::Forbidden)
+                ),
+                _ => false,
+            }
+    }
+
+    async fn reauthenticate_session(&self) -> Result<SessionTokens, RefreshTokenError> {
+        let callback = self
+            .client
+            .auth_ctx()
+            .reauth_session_callback
+            .get()
+            .ok_or(RefreshTokenError::RefreshTokenRequired)?;
+        let expected_session_meta =
+            self.client.session_meta().cloned().ok_or(RefreshTokenError::RefreshTokenRequired)?;
+        let expected_user_id = expected_session_meta.user_id.clone();
+        let expected_device_id = expected_session_meta.device_id.clone();
+
+        let mut request = callback(expected_session_meta)
+            .await
+            .map_err(|err| RefreshTokenError::SessionCallback(err.to_string()))?;
+        request.device_id = Some(expected_device_id.clone());
+        let response = self
+            .client
+            .send_inner(request, Some(RequestConfig::short_retry()), Default::default())
+            .await
+            .map_err(|err| RefreshTokenError::MatrixAuth(err.into()))?;
+
+        self.client.maybe_update_login_well_known(response.well_known.as_ref());
+
+        if response.user_id != expected_user_id || response.device_id != expected_device_id {
+            return Err(RefreshTokenError::SessionMismatch {
+                expected_user_id: expected_user_id.to_string(),
+                expected_device_id: expected_device_id.to_string(),
+                got_user_id: response.user_id.to_string(),
+                got_device_id: response.device_id.to_string(),
+            });
+        }
+
+        Ok(SessionTokens {
+            access_token: response.access_token,
+            refresh_token: response.refresh_token,
+        })
     }
 
     /// Register a user to the server.
