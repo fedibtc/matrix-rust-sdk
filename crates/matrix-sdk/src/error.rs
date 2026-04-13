@@ -395,6 +395,10 @@ pub enum Error {
     #[error("session callbacks have been set multiple times")]
     MultipleSessionCallbacks,
 
+    /// Matrix session reauthentication callback has been set multiple times.
+    #[error("matrix session reauthentication callback has been set multiple times")]
+    MultipleSessionReauthCallbacks,
+
     /// An error occurred interacting with the OAuth 2.0 API.
     #[error(transparent)]
     OAuth(Box<OAuthError>),
@@ -701,6 +705,26 @@ pub enum RefreshTokenError {
     /// An error occurred interacting with the OAuth 2.0 API.
     #[error(transparent)]
     OAuth(#[from] Arc<OAuthError>),
+
+    /// The Matrix session reauthentication callback failed.
+    #[error("matrix session reauthentication callback failed: {0}")]
+    SessionCallback(String),
+
+    /// The Matrix session reauthentication callback returned a different
+    /// session identity than the active one.
+    #[error(
+        "matrix session reauthentication returned user {got_user_id} on device {got_device_id}, expected user {expected_user_id} on device {expected_device_id}"
+    )]
+    SessionMismatch {
+        /// The Matrix user ID of the active session.
+        expected_user_id: String,
+        /// The Matrix device ID of the active session.
+        expected_device_id: String,
+        /// The Matrix user ID returned by the reauthentication attempt.
+        got_user_id: String,
+        /// The Matrix device ID returned by the reauthentication attempt.
+        got_device_id: String,
+    },
 }
 
 impl RefreshTokenError {
@@ -709,7 +733,11 @@ impl RefreshTokenError {
     pub(crate) fn is_session_rejected(&self) -> bool {
         match self {
             // There is no refresh token to exchange and retrying won't fix it.
-            Self::RefreshTokenRequired => true,
+            // The same goes for a login that couldn't be built, or that landed
+            // on another session.
+            Self::RefreshTokenRequired
+            | Self::SessionCallback(_)
+            | Self::SessionMismatch { .. } => true,
 
             Self::MatrixAuth(http_error) => http_error
                 .as_client_api_error()

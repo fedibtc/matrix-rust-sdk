@@ -125,7 +125,10 @@ where
                         Ok(RetryRequest::No)
                     }
 
-                    RefreshTokenError::OAuth(_) | RefreshTokenError::MatrixAuth(_) => {
+                    RefreshTokenError::OAuth(_)
+                    | RefreshTokenError::MatrixAuth(_)
+                    | RefreshTokenError::SessionCallback(_)
+                    | RefreshTokenError::SessionMismatch { .. } => {
                         if refresh_error.is_session_rejected() {
                             error!(
                                 "Token refresh: the refresh token was rejected: {refresh_error}"
