@@ -14,9 +14,10 @@
 
 //! Types and functions related to authentication in Matrix.
 
-use std::{fmt, sync::Arc};
+use std::{fmt, future::Future, pin::Pin, result::Result as StdResult, sync::Arc};
 
 use matrix_sdk_base::{SessionMeta, locks::Mutex};
+use ruma::api::client::session::login;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex as AsyncMutex, OnceCell, broadcast};
 
@@ -77,6 +78,19 @@ pub(crate) type ReloadSessionCallback =
 pub(crate) type ReloadSessionCallback =
     dyn Fn(Client) -> Result<SessionTokens, SessionCallbackError>;
 
+#[cfg(not(target_family = "wasm"))]
+pub(crate) type ReauthSessionCallbackFut =
+    Pin<Box<dyn Future<Output = StdResult<login::v3::Request, SessionCallbackError>> + Send>>;
+#[cfg(target_family = "wasm")]
+pub(crate) type ReauthSessionCallbackFut =
+    Pin<Box<dyn Future<Output = StdResult<login::v3::Request, SessionCallbackError>>>>;
+
+#[cfg(not(target_family = "wasm"))]
+pub(crate) type ReauthSessionCallback =
+    dyn Fn(SessionMeta) -> ReauthSessionCallbackFut + Send + Sync;
+#[cfg(target_family = "wasm")]
+pub(crate) type ReauthSessionCallback = dyn Fn(SessionMeta) -> ReauthSessionCallbackFut;
+
 /// All the data relative to authentication, and that must be shared between a
 /// client and all its children.
 pub(crate) struct AuthCtx {
@@ -114,6 +128,14 @@ pub(crate) struct AuthCtx {
     /// Internal invariant: this must be called only after `set_session_tokens`
     /// has been called, not before.
     pub(crate) save_session_callback: OnceCell<Box<SaveSessionCallback>>,
+
+    /// A callback to recover a Matrix session by logging back in with the same
+    /// account and device ID when refreshing the token is not possible.
+    ///
+    /// The callback receives a copy of the current session metadata so it can
+    /// derive credentials without calling back into the SDK while the refresh
+    /// lock is held.
+    pub(crate) reauth_session_callback: OnceCell<Box<ReauthSessionCallback>>,
 }
 
 impl AuthCtx {
@@ -127,6 +149,7 @@ impl AuthCtx {
             tokens: OnceCell::default(),
             reload_session_callback: OnceCell::default(),
             save_session_callback: OnceCell::default(),
+            reauth_session_callback: OnceCell::default(),
             oauth: OAuthCtx::new(allow_insecure_oauth),
         }
     }

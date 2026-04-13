@@ -28,6 +28,8 @@ use ruma::{
         client::{
             account::register,
             error::{ErrorKind, UnknownTokenErrorData},
+            session::login,
+            uiaa::UserIdentifier,
         },
     },
     assign, owned_device_id, owned_user_id,
@@ -36,7 +38,7 @@ use serde_json::json;
 use tokio::sync::{broadcast::error::TryRecvError, mpsc};
 use wiremock::{
     Mock, ResponseTemplate,
-    matchers::{body_partial_json, header, method, path},
+    matchers::{body_partial_json, header, method, path, path_regex},
 };
 
 fn session() -> MatrixSession {
@@ -46,6 +48,13 @@ fn session() -> MatrixSession {
             access_token: "1234".to_owned(),
             refresh_token: Some("abcd".to_owned()),
         },
+    }
+}
+
+fn session_without_refresh_token() -> MatrixSession {
+    MatrixSession {
+        meta: mock_session_meta(),
+        tokens: SessionTokens { access_token: "1234".to_owned(), refresh_token: None },
     }
 }
 
@@ -382,6 +391,453 @@ async fn test_refresh_token_handled_failure() {
         http_err.client_api_error_kind(),
         Some(ErrorKind::UnknownToken(UnknownTokenErrorData { soft_logout: true, .. }))
     );
+
+    assert_matches!(
+        session_changes.try_recv(),
+        Ok(SessionChange::UnknownToken(UnknownTokenErrorData { soft_logout: true, .. }))
+    );
+    assert_eq!(session_changes.try_recv(), Err(TryRecvError::Empty));
+}
+
+#[async_test]
+async fn test_refresh_token_handled_by_reauth_callback_without_refresh_token() {
+    let (builder, server) = test_client_builder_with_server().await;
+    let client = builder
+        .request_config(RequestConfig::new().disable_retry())
+        .server_versions([MatrixVersion::V1_3])
+        .handle_refresh_tokens()
+        .build()
+        .await
+        .unwrap();
+    let auth = client.matrix_auth();
+
+    auth.restore_session(session_without_refresh_token(), RoomLoadSettings::default())
+        .await
+        .unwrap();
+
+    let num_save_session_callback_calls = Arc::new(Mutex::new(0));
+    client
+        .set_session_callbacks(Box::new(|_| panic!("reload session never called")), {
+            let num_save_session_callback_calls = num_save_session_callback_calls.clone();
+            Box::new(move |_client| {
+                *num_save_session_callback_calls.lock().unwrap() += 1;
+                Ok(())
+            })
+        })
+        .unwrap();
+
+    auth.set_session_reauth_callback(|_| async {
+        Ok::<_, std::io::Error>(assign!(
+            login::v3::Request::new(login::v3::LoginInfo::Password(login::v3::Password::new(
+                UserIdentifier::UserIdOrLocalpart("example".into()),
+                "wordpass".to_owned(),
+            ))),
+            {
+                refresh_token: true,
+            }
+        ))
+    })
+    .unwrap();
+
+    let mut session_changes = client.subscribe_to_session_changes();
+
+    Mock::given(method("POST"))
+        .and(path("/_matrix/client/v3/refresh"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(&*test_json::REFRESH_TOKEN))
+        .expect(0)
+        .named("`POST /refresh`")
+        .mount(&server)
+        .await;
+
+    Mock::given(method("POST"))
+        .and(path_regex(r"^/_matrix/client/(r0|v3)/login$"))
+        .and(body_partial_json(json!({
+            "device_id": "DEVICEID",
+            "refresh_token": true,
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "access_token": "5678",
+            "device_id": "DEVICEID",
+            "refresh_token": "wxyz",
+            "user_id": "@example:localhost",
+        })))
+        .expect(1)
+        .named("`POST /login` reauth")
+        .mount(&server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v3/account/whoami"))
+        .and(header(http::header::AUTHORIZATION, "Bearer 1234"))
+        .respond_with(
+            ResponseTemplate::new(401).set_body_json(&*test_json::UNKNOWN_TOKEN_SOFT_LOGOUT),
+        )
+        .expect(1)
+        .named("`GET /whoami` wrong token")
+        .mount(&server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v3/account/whoami"))
+        .and(header(http::header::AUTHORIZATION, "Bearer 5678"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(&*test_json::WHOAMI))
+        .expect(1)
+        .named("`GET /whoami` good token")
+        .mount(&server)
+        .await;
+
+    client.whoami().await.unwrap();
+
+    assert_eq!(
+        client.session_tokens(),
+        Some(SessionTokens {
+            access_token: "5678".to_owned(),
+            refresh_token: Some("wxyz".to_owned()),
+        })
+    );
+    assert_eq!(*num_save_session_callback_calls.lock().unwrap(), 1);
+    assert_eq!(session_changes.try_recv(), Ok(SessionChange::TokensRefreshed));
+    assert_eq!(session_changes.try_recv(), Err(TryRecvError::Empty));
+}
+
+#[async_test]
+async fn test_refresh_token_handled_by_reauth_callback_without_requesting_refresh_token() {
+    let (builder, server) = test_client_builder_with_server().await;
+    let client = builder
+        .request_config(RequestConfig::new().disable_retry())
+        .server_versions([MatrixVersion::V1_3])
+        .handle_refresh_tokens()
+        .build()
+        .await
+        .unwrap();
+    let auth = client.matrix_auth();
+
+    auth.restore_session(session_without_refresh_token(), RoomLoadSettings::default())
+        .await
+        .unwrap();
+
+    auth.set_session_reauth_callback(|_| async {
+        Ok::<_, std::io::Error>(assign!(
+            login::v3::Request::new(login::v3::LoginInfo::Password(login::v3::Password::new(
+                UserIdentifier::UserIdOrLocalpart("example".into()),
+                "wordpass".to_owned(),
+            ))),
+            {
+                initial_device_display_name: Some("Reauth device".to_owned()),
+                refresh_token: false,
+            }
+        ))
+    })
+    .unwrap();
+
+    let mut session_changes = client.subscribe_to_session_changes();
+
+    Mock::given(method("POST"))
+        .and(path("/_matrix/client/v3/refresh"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(&*test_json::REFRESH_TOKEN))
+        .expect(0)
+        .named("`POST /refresh`")
+        .mount(&server)
+        .await;
+
+    Mock::given(method("POST"))
+        .and(path_regex(r"^/_matrix/client/(r0|v3)/login$"))
+        .and(|request: &wiremock::Request| {
+            let body: serde_json::Value = request.body_json().unwrap();
+            assert_eq!(body.get("device_id"), Some(&json!("DEVICEID")));
+            assert_eq!(body.get("initial_device_display_name"), Some(&json!("Reauth device")));
+            assert!(
+                body.get("refresh_token").is_none(),
+                "refresh_token=false should be omitted from the wire format"
+            );
+            true
+        })
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "access_token": "5678",
+            "device_id": "DEVICEID",
+            "user_id": "@example:localhost",
+        })))
+        .expect(1)
+        .named("`POST /login` reauth without refresh token")
+        .mount(&server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v3/account/whoami"))
+        .and(header(http::header::AUTHORIZATION, "Bearer 1234"))
+        .respond_with(
+            ResponseTemplate::new(401).set_body_json(&*test_json::UNKNOWN_TOKEN_SOFT_LOGOUT),
+        )
+        .expect(1)
+        .named("`GET /whoami` wrong token")
+        .mount(&server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v3/account/whoami"))
+        .and(header(http::header::AUTHORIZATION, "Bearer 5678"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(&*test_json::WHOAMI))
+        .expect(1)
+        .named("`GET /whoami` good token")
+        .mount(&server)
+        .await;
+
+    client.whoami().await.unwrap();
+
+    assert_eq!(
+        client.session_tokens(),
+        Some(SessionTokens { access_token: "5678".to_owned(), refresh_token: None })
+    );
+    assert_eq!(session_changes.try_recv(), Ok(SessionChange::TokensRefreshed));
+    assert_eq!(session_changes.try_recv(), Err(TryRecvError::Empty));
+}
+
+#[async_test]
+async fn test_refresh_token_handled_by_reauth_callback_after_refresh_token_failure() {
+    let (builder, server) = test_client_builder_with_server().await;
+    let client = builder
+        .request_config(RequestConfig::new().disable_retry())
+        .server_versions([MatrixVersion::V1_3])
+        .handle_refresh_tokens()
+        .build()
+        .await
+        .unwrap();
+    let auth = client.matrix_auth();
+
+    auth.restore_session(session(), RoomLoadSettings::default()).await.unwrap();
+
+    auth.set_session_reauth_callback(|_| async {
+        Ok::<_, std::io::Error>(assign!(
+            login::v3::Request::new(login::v3::LoginInfo::Password(login::v3::Password::new(
+                UserIdentifier::UserIdOrLocalpart("example".into()),
+                "wordpass".to_owned(),
+            ))),
+            {
+                refresh_token: true,
+            }
+        ))
+    })
+    .unwrap();
+
+    let mut session_changes = client.subscribe_to_session_changes();
+
+    Mock::given(method("POST"))
+        .and(path("/_matrix/client/v3/refresh"))
+        .respond_with(
+            ResponseTemplate::new(401).set_body_json(&*test_json::UNKNOWN_TOKEN_SOFT_LOGOUT),
+        )
+        .expect(1)
+        .named("`POST /refresh`")
+        .mount(&server)
+        .await;
+
+    Mock::given(method("POST"))
+        .and(path_regex(r"^/_matrix/client/(r0|v3)/login$"))
+        .and(body_partial_json(json!({
+            "device_id": "DEVICEID",
+            "refresh_token": true,
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "access_token": "5678",
+            "device_id": "DEVICEID",
+            "refresh_token": "wxyz",
+            "user_id": "@example:localhost",
+        })))
+        .expect(1)
+        .named("`POST /login` reauth")
+        .mount(&server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v3/account/whoami"))
+        .and(header(http::header::AUTHORIZATION, "Bearer 1234"))
+        .respond_with(
+            ResponseTemplate::new(401).set_body_json(&*test_json::UNKNOWN_TOKEN_SOFT_LOGOUT),
+        )
+        .expect(1)
+        .named("`GET /whoami` wrong token")
+        .mount(&server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v3/account/whoami"))
+        .and(header(http::header::AUTHORIZATION, "Bearer 5678"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(&*test_json::WHOAMI))
+        .expect(1)
+        .named("`GET /whoami` good token")
+        .mount(&server)
+        .await;
+
+    client.whoami().await.unwrap();
+
+    assert_eq!(session_changes.try_recv(), Ok(SessionChange::TokensRefreshed));
+    assert_eq!(session_changes.try_recv(), Err(TryRecvError::Empty));
+}
+
+#[async_test]
+async fn test_refresh_token_handled_by_reauth_callback_after_expired_refresh_token_failure() {
+    let (builder, server) = test_client_builder_with_server().await;
+    let client = builder
+        .request_config(RequestConfig::new().disable_retry())
+        .server_versions([MatrixVersion::V1_3])
+        .handle_refresh_tokens()
+        .build()
+        .await
+        .unwrap();
+    let auth = client.matrix_auth();
+
+    auth.restore_session(session(), RoomLoadSettings::default()).await.unwrap();
+
+    auth.set_session_reauth_callback(|_| async {
+        Ok::<_, std::io::Error>(assign!(
+            login::v3::Request::new(login::v3::LoginInfo::Password(login::v3::Password::new(
+                UserIdentifier::UserIdOrLocalpart("example".into()),
+                "wordpass".to_owned(),
+            ))),
+            {
+                refresh_token: true,
+            }
+        ))
+    })
+    .unwrap();
+
+    let mut session_changes = client.subscribe_to_session_changes();
+
+    Mock::given(method("POST"))
+        .and(path("/_matrix/client/v3/refresh"))
+        .respond_with(ResponseTemplate::new(403).set_body_json(json!({
+            "errcode": "M_FORBIDDEN",
+            "error": "The supplied refresh token has expired",
+        })))
+        .expect(1)
+        .named("`POST /refresh` expired refresh token")
+        .mount(&server)
+        .await;
+
+    Mock::given(method("POST"))
+        .and(path_regex(r"^/_matrix/client/(r0|v3)/login$"))
+        .and(body_partial_json(json!({
+            "device_id": "DEVICEID",
+            "refresh_token": true,
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "access_token": "5678",
+            "device_id": "DEVICEID",
+            "refresh_token": "wxyz",
+            "user_id": "@example:localhost",
+        })))
+        .expect(1)
+        .named("`POST /login` reauth")
+        .mount(&server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v3/account/whoami"))
+        .and(header(http::header::AUTHORIZATION, "Bearer 1234"))
+        .respond_with(
+            ResponseTemplate::new(401).set_body_json(&*test_json::UNKNOWN_TOKEN_SOFT_LOGOUT),
+        )
+        .expect(1)
+        .named("`GET /whoami` wrong token")
+        .mount(&server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v3/account/whoami"))
+        .and(header(http::header::AUTHORIZATION, "Bearer 5678"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(&*test_json::WHOAMI))
+        .expect(1)
+        .named("`GET /whoami` good token")
+        .mount(&server)
+        .await;
+
+    client.whoami().await.unwrap();
+
+    assert_eq!(session_changes.try_recv(), Ok(SessionChange::TokensRefreshed));
+    assert_eq!(session_changes.try_recv(), Err(TryRecvError::Empty));
+}
+
+#[async_test]
+async fn test_refresh_token_reauth_callback_mismatch() {
+    let (builder, server) = test_client_builder_with_server().await;
+    let client = builder
+        .request_config(RequestConfig::new().disable_retry())
+        .server_versions([MatrixVersion::V1_3])
+        .handle_refresh_tokens()
+        .build()
+        .await
+        .unwrap();
+    let auth = client.matrix_auth();
+
+    auth.restore_session(session_without_refresh_token(), RoomLoadSettings::default())
+        .await
+        .unwrap();
+
+    auth.set_session_reauth_callback(|_| async {
+        Ok::<_, std::io::Error>(assign!(
+            login::v3::Request::new(login::v3::LoginInfo::Password(login::v3::Password::new(
+                UserIdentifier::UserIdOrLocalpart("example".into()),
+                "wordpass".to_owned(),
+            ))),
+            {
+                refresh_token: true,
+            }
+        ))
+    })
+    .unwrap();
+
+    let mut session_changes = client.subscribe_to_session_changes();
+
+    Mock::given(method("POST"))
+        .and(path_regex(r"^/_matrix/client/(r0|v3)/login$"))
+        .and(body_partial_json(json!({
+            "device_id": "DEVICEID",
+            "refresh_token": true,
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "access_token": "5678",
+            "device_id": "OTHERDEVICE",
+            "refresh_token": "wxyz",
+            "user_id": "@example:localhost",
+        })))
+        .expect(1)
+        .named("`POST /login` reauth mismatch")
+        .mount(&server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v3/account/whoami"))
+        .and(header(http::header::AUTHORIZATION, "Bearer 1234"))
+        .respond_with(
+            ResponseTemplate::new(401).set_body_json(&*test_json::UNKNOWN_TOKEN_SOFT_LOGOUT),
+        )
+        .expect(1)
+        .named("`GET /whoami` wrong token")
+        .mount(&server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v3/account/whoami"))
+        .and(header(http::header::AUTHORIZATION, "Bearer 5678"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(&*test_json::WHOAMI))
+        .expect(0)
+        .named("`GET /whoami` good token")
+        .mount(&server)
+        .await;
+
+    let res = client.whoami().await;
+    assert_let!(
+        Err(HttpError::RefreshToken(RefreshTokenError::SessionMismatch {
+            expected_user_id,
+            expected_device_id,
+            got_user_id,
+            got_device_id,
+        })) = res
+    );
+    assert_eq!(expected_user_id, "@example:localhost");
+    assert_eq!(expected_device_id, "DEVICEID");
+    assert_eq!(got_user_id, "@example:localhost");
+    assert_eq!(got_device_id, "OTHERDEVICE");
 
     assert_matches!(
         session_changes.try_recv(),
