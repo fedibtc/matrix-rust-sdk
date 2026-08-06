@@ -83,6 +83,7 @@ pub use caches::{
 pub use redecryptor::{DecryptionRetryRequest, RedecryptorReport};
 
 pub use crate::event_cache::automatic_pagination::AutomaticPagination;
+pub use crate::event_cache::back_pagination_queue::BackPaginationQueue;
 
 /// An error observed in the [`EventCache`].
 #[derive(thiserror::Error, Clone, Debug)]
