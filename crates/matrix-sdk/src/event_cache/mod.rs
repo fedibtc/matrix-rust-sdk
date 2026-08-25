@@ -30,6 +30,7 @@
 use std::{
     collections::HashMap,
     fmt,
+    num::NonZeroUsize,
     sync::{Arc, OnceLock, RwLock as StdRwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
@@ -483,7 +484,7 @@ pub struct EventCacheConfig {
     ///
     /// Defaults to
     /// [`EventCacheConfig::DEFAULT_MAX_CONCURRENT_BACK_PAGINATIONS`].
-    pub max_concurrent_back_paginations: usize,
+    pub max_concurrent_back_paginations: NonZeroUsize,
 }
 
 impl EventCacheConfig {
@@ -506,7 +507,7 @@ impl EventCacheConfig {
 
     /// The default maximum number of concurrent background back-paginations
     /// (see also [`EventCacheConfig::max_concurrent_back_paginations`]).
-    pub const DEFAULT_MAX_CONCURRENT_BACK_PAGINATIONS: usize = 3;
+    pub const DEFAULT_MAX_CONCURRENT_BACK_PAGINATIONS: NonZeroUsize = NonZeroUsize::new(3).unwrap();
 }
 
 impl Default for EventCacheConfig {
