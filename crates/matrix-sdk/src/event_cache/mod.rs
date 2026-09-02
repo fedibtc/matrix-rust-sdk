@@ -61,7 +61,7 @@ use crate::{
 };
 
 mod automatic_pagination;
-mod back_pagination_queue;
+pub(crate) mod back_pagination_queue;
 mod caches;
 mod deduplicator;
 mod persistence;
@@ -85,7 +85,6 @@ pub use redecryptor::{DecryptionRetryRequest, RedecryptorReport};
 
 pub use crate::event_cache::automatic_pagination::AutomaticPagination;
 pub use crate::event_cache::back_pagination_queue::BackPaginationQueue;
-pub(crate) use crate::event_cache::back_pagination_queue::{BATCH_SIZE, BackPaginationRequest, Priority};
 
 /// An error observed in the [`EventCache`].
 #[derive(thiserror::Error, Clone, Debug)]
