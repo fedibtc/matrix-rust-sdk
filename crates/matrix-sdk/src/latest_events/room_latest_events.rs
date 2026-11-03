@@ -362,11 +362,8 @@ mod tests {
         let sender = user_id!("@bob:example.org");
 
         let server = MatrixMockServer::new().await;
-        let client = server
-            .client_builder()
-            .on_builder(|builder| builder.with_enable_automatic_back_pagination(true))
-            .build()
-            .await;
+        let client = server.client_builder().build().await;
+        client.event_cache().config_mut().experimental_auto_backpagination = true;
 
         client.base_client().get_or_create_room(room_id, RoomState::Joined);
 

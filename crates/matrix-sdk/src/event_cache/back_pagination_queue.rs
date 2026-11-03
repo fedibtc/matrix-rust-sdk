@@ -556,7 +556,7 @@ async fn run_request(
             return BackPaginationRunResult { reason: BackPaginationStopReason::Skipped };
         }
         match inner.all_caches_for_room(&request.room_id).await {
-            Ok(caches) => caches.room().pagination(),
+            Ok(caches) => caches.room.pagination(),
             Err(err) => {
                 warn!("no caches for room while back-paginating: {err}");
                 return BackPaginationRunResult { reason: BackPaginationStopReason::Failed };
