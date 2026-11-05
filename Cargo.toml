@@ -53,7 +53,7 @@ indexed_db_futures = { version = "0.7.0", package = "matrix_indexed_db_futures",
 indexmap = { version = "2.14.2", default-features = false }
 insta = { version = "1.48.0", features = ["json", "redactions"] }
 itertools = { version = "0.15.0", default-features = false, features = ["use_std"] }
-js-sys = { version = "0.3.105", default-features = false, features = ["std"] }
+js-sys = { version = "0.3.91", default-features = false, features = ["std"] }
 mime = { version = "0.3.17", default-features = false }
 oauth2 = { version = "5.0.0", default-features = false, features = ["timing-resistant-secret-traits"] }
 oauth2-reqwest = { version = "0.1.0-alpha.3", default-features = false }
@@ -124,9 +124,9 @@ url = { version = "2.5.8", default-features = false }
 uuid = { version = "1.26.1", default-features = false }
 vergen-gitcl = { version = "10.0.3", default-features = false }
 vodozemac = { version = "0.11.1", features = ["insecure-pk-encryption", "experimental-session-config"] }
-wasm-bindgen = { version = "0.2.128", default-features = false }
-wasm-bindgen-test = { version = "0.3.78", default-features = false, features = ["std"] }
-web-sys = { version = "0.3.105", default-features = false }
+wasm-bindgen = { version = "0.2.114", default-features = false }
+wasm-bindgen-test = { version = "0.3.64", default-features = false, features = ["std"] }
+web-sys = { version = "0.3.91", default-features = false }
 wiremock = { version = "0.6.5", default-features = false }
 zeroize = "1.9.0"
 zxcvbn = { version = "3.1.1", default-features = false }
